@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# SECURITY - never upload these to GitHub
+*.jks
+*.keystore
+android/key.properties
+google-services.json
+GoogleService-Info.plist
+lib/firebase_options.dart
