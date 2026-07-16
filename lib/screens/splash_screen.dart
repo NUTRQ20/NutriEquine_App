@@ -7,7 +7,6 @@ import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -16,61 +15,51 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _fadeAnim;
-  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
+        vsync: this, duration: const Duration(milliseconds: 1200));
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
     _ctrl.forward();
     _navigate();
   }
 
   Future<void> _navigate() async {
-    // Minimum splash display time
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-
     try {
-      // Check Firebase Auth state
       final user = FirebaseAuth.instance.currentUser;
-
-      // Check onboarding
       bool seenOnboarding = false;
       try {
         final prefs = await SharedPreferences.getInstance();
         seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
-      } catch (_) {
-        seenOnboarding = false;
-      }
-
+      } catch (_) {}
       if (!mounted) return;
-
       if (!seenOnboarding) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          (_) => false,
         );
         return;
       }
-
       if (user != null) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (_) => false,
         );
       } else {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
         );
       }
     } catch (e) {
-      // If anything fails, go to login screen
       if (mounted) {
-        Navigator.of(context).pushReplacement(
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
         );
       }
     }
@@ -106,50 +95,29 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.pets,
-                  size: 56,
-                  color: Color(0xFF2F5233),
-                ),
+                child: const Icon(Icons.pets, size: 56,
+                    color: Color(0xFF2F5233)),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'NutriEquine',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
+              const Text('NutriEquine',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2)),
               const SizedBox(height: 8),
-              const Text(
-                'Horse Care Operating System',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              const Text('Horse Care Operating System',
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      letterSpacing: 0.5)),
               const SizedBox(height: 48),
-              if (_errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                )
-              else
-                const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
-                ),
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2.5),
+              ),
             ],
           ),
         ),

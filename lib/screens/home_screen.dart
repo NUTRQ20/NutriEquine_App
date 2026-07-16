@@ -7,6 +7,7 @@ import 'barn_tasks_screen.dart';
 import 'education_hub_screen.dart';
 import 'premium_screen.dart';
 import 'firebase_data_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +25,35 @@ class _HomeScreenState extends State<HomeScreen> {
     EducationHubScreen(),
   ];
 
+  Future<void> _signOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text('You will be returned to the login screen.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      await context.read<AuthService>().signOut();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,55 +67,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          // Firebase data viewer
           IconButton(
             icon: const Icon(Icons.storage),
             tooltip: 'View Firebase data',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const FirebaseDataScreen()),
-            ),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const FirebaseDataScreen())),
           ),
-          // Premium
           IconButton(
             icon: const Icon(Icons.star_outline),
             tooltip: 'Go Premium',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PremiumScreen()),
-            ),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PremiumScreen())),
           ),
-          // Sign out
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Sign out?'),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel')),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Sign out')),
-                  ],
-                ),
-              );
-              if (confirm == true && context.mounted) {
-                context.read<AuthService>().signOut();
-              }
-            },
+            onPressed: _signOut,
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _index,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

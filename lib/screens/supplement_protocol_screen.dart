@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'login_screen.dart';
 
 class SupplementProtocolScreen extends StatefulWidget {
   const SupplementProtocolScreen({super.key});
@@ -14,8 +16,10 @@ class _SupplementProtocolScreenState
   int? _ageYears;
   final Set<String> _goals = {};
   _Protocol? _result;
-
   final _ageCtrl = TextEditingController();
+
+  bool get _isLoggedIn =>
+      FirebaseAuth.instance.currentUser != null;
 
   static const _disciplines = [
     'Pleasure / Trail',
@@ -44,56 +48,48 @@ class _SupplementProtocolScreenState
 
   void _generateProtocol() {
     final recs = <_SupplementRec>[];
-
     if (_goals.any((g) => g.contains('Gut'))) {
       recs.add(_SupplementRec(
         name: 'NutriEquine GutCare',
         dosage: '1 scoop twice daily with feed',
         timing: 'AM and PM',
         duration: '90 days minimum',
-        notes:
-            'Give consistently at the same time daily. Works best when fed with a small amount of hay to buffer stomach acid.',
-        monitor: 'Appetite, manure consistency, girthiness, behavior during girthing',
+        notes: 'Give consistently at the same time daily. '
+            'Works best when fed with a small amount of hay.',
+        monitor: 'Appetite, manure consistency, girthiness',
       ));
     }
-
     if (_goals.any((g) => g.contains('Joint'))) {
       recs.add(_SupplementRec(
         name: 'NutriEquine FlexSupport',
         dosage: '2 scoops daily',
         timing: 'AM feed',
         duration: '60–90 days to assess effect',
-        notes:
-            'Joint supplements take time. Evaluate after 60 days for changes in stride and willingness to work.',
+        notes: 'Evaluate after 60 days for changes in stride.',
         monitor:
             'Stride length, stiffness after rest, willingness on circles',
       ));
     }
-
     if (_goals.any((g) => g.contains('Coat'))) {
       recs.add(_SupplementRec(
         name: 'NutriEquine CoatShine',
         dosage: '1 scoop daily',
         timing: 'Any meal',
-        duration: '90 days (hoof improvement takes 6–12 months)',
-        notes:
-            'Biotin, zinc, copper and omega-3s. Coat response visible at 60–90 days; hoof wall changes take much longer.',
-        monitor: 'Coat sheen, hoof wall hardness, hoof growth rate',
+        duration: '90 days (hoof improvement 6–12 months)',
+        notes: 'Biotin, zinc, copper and omega-3s.',
+        monitor: 'Coat sheen, hoof wall hardness',
       ));
     }
-
     if (_goals.any((g) => g.contains('Performance'))) {
       recs.add(_SupplementRec(
         name: 'NutriEquine RecoveryBlend',
         dosage: '2 scoops post-exercise',
         timing: 'Within 1 hour of hard work',
         duration: 'Ongoing during training season',
-        notes:
-            'Electrolytes, quality protein and antioxidants. Give after cooling down; always ensure fresh water is available.',
-        monitor: 'Recovery time, muscle soreness signs, topline condition',
+        notes: 'Always ensure fresh water is available.',
+        monitor: 'Recovery time, muscle soreness, topline',
       ));
     }
-
     if (_goals.any((g) => g.contains('Senior')) ||
         (_ageYears != null && _ageYears! >= 18)) {
       recs.add(_SupplementRec(
@@ -101,37 +97,30 @@ class _SupplementProtocolScreenState
         dosage: '2 scoops daily',
         timing: 'Split AM and PM',
         duration: 'Long-term / ongoing',
-        notes:
-            'Designed for horses 15+. Addresses reduced protein absorption, dental challenges, and immune changes common in senior horses.',
-        monitor: 'Body condition score monthly, topline, water intake, coat quality',
+        notes: 'Designed for horses 15+.',
+        monitor: 'BCS monthly, topline, water intake',
       ));
     }
-
     if (_goals.any((g) => g.contains('Stress'))) {
       recs.add(_SupplementRec(
         name: 'NutriEquine CalmMag',
         dosage: '1 scoop daily',
         timing: 'Morning feed',
         duration: '30 days trial',
-        notes:
-            'Magnesium-based calming support. Not sedating. Evaluate after 30 days for changes in focus and behavior.',
-        monitor:
-            'Spookiness, focus during work, box-walking or weaving behavior',
+        notes: 'Magnesium-based. Not sedating.',
+        monitor: 'Spookiness, focus during work',
       ));
     }
-
     if (recs.isEmpty) {
       recs.add(_SupplementRec(
         name: 'NutriEquine DailyFoundation',
         dosage: '1 scoop daily',
         timing: 'Any meal',
         duration: 'Ongoing',
-        notes:
-            'A comprehensive daily vitamin-mineral supplement suitable for most horses on hay-based diets.',
+        notes: 'Comprehensive daily vitamin-mineral supplement.',
         monitor: 'Overall condition, energy, coat quality',
       ));
     }
-
     setState(() => _result = _Protocol(
           discipline: _discipline ?? 'General',
           goals: _goals.toList(),
@@ -151,23 +140,51 @@ class _SupplementProtocolScreenState
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: _buildStep(),
+        child: _isLoggedIn ? _buildStep() : _buildLoginPrompt(),
+      ),
+    );
+  }
+
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_outline,
+              size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text('Sign in required',
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text(
+            'Please sign in to access the supplement protocol quiz.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            icon: const Icon(Icons.login),
+            label: const Text('Sign in'),
+            onPressed: () =>
+                Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                  builder: (_) => const LoginScreen()),
+              (_) => false,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildStep() {
     switch (_step) {
-      case 0:
-        return _buildDisciplineStep();
-      case 1:
-        return _buildAgeStep();
-      case 2:
-        return _buildGoalsStep();
-      case 3:
-        return _buildResultStep();
-      default:
-        return const SizedBox();
+      case 0: return _buildDisciplineStep();
+      case 1: return _buildAgeStep();
+      case 2: return _buildGoalsStep();
+      case 3: return _buildResultStep();
+      default: return const SizedBox();
     }
   }
 
@@ -178,7 +195,7 @@ class _SupplementProtocolScreenState
         const Text('Step 1 of 3',
             style: TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 8),
-        Text('What is your horse\'s primary discipline?',
+        Text("What is your horse's primary discipline?",
             style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
         Expanded(
@@ -188,7 +205,8 @@ class _SupplementProtocolScreenState
                       value: d,
                       groupValue: _discipline,
                       title: Text(d),
-                      onChanged: (v) => setState(() => _discipline = v),
+                      onChanged: (v) =>
+                          setState(() => _discipline = v),
                     ))
                 .toList(),
           ),
@@ -218,17 +236,14 @@ class _SupplementProtocolScreenState
             labelText: 'Age in years',
             border: OutlineInputBorder(),
           ),
-          onChanged: (v) => setState(() => _ageYears = int.tryParse(v)),
+          onChanged: (v) =>
+              setState(() => _ageYears = int.tryParse(v)),
         ),
         const SizedBox(height: 16),
         FilledButton(
-          onPressed: _next,
-          child: const Text('Next'),
-        ),
+            onPressed: _next, child: const Text('Next')),
         TextButton(
-          onPressed: _next,
-          child: const Text('Skip'),
-        ),
+            onPressed: _next, child: const Text('Skip')),
       ],
     );
   }
@@ -281,18 +296,21 @@ class _SupplementProtocolScreenState
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Text(r.name,
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
                       const SizedBox(height: 8),
                       _ProtocolRow('Dosage', r.dosage),
                       _ProtocolRow('Timing', r.timing),
                       _ProtocolRow('Duration', r.duration),
                       const Divider(),
                       Text(r.notes,
-                          style: const TextStyle(color: Colors.grey)),
+                          style: const TextStyle(
+                              color: Colors.grey)),
                       const SizedBox(height: 4),
                       Text('Monitor: ${r.monitor}',
                           style: const TextStyle(
@@ -307,14 +325,16 @@ class _SupplementProtocolScreenState
           ),
         ),
         const Text(
-          'This protocol is educational and not a veterinary diagnosis. Consult your vet before starting any new supplement, especially if your horse has existing health conditions.',
-          style: TextStyle(fontSize: 11, color: Colors.grey),
+          'Educational only — not a veterinary diagnosis. '
+          'Consult your vet before starting any new supplement.',
+          style:
+              TextStyle(fontSize: 11, color: Colors.grey),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         FilledButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Add these to my horse\'s feed plan'),
+          child: const Text("Add these to my horse's feed plan"),
         ),
       ],
     );
@@ -336,8 +356,11 @@ class _ProtocolRow extends StatelessWidget {
               width: 80,
               child: Text(label,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13))),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13))),
+          Expanded(
+              child: Text(value,
+                  style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -348,10 +371,11 @@ class _Protocol {
   final String discipline;
   final List<String> goals;
   final List<_SupplementRec> recommendations;
-  _Protocol(
-      {required this.discipline,
-      required this.goals,
-      required this.recommendations});
+  _Protocol({
+    required this.discipline,
+    required this.goals,
+    required this.recommendations,
+  });
 }
 
 class _SupplementRec {
