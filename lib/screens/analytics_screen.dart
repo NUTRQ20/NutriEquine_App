@@ -42,21 +42,52 @@ class _BcsChart extends StatelessWidget {
     return StreamBuilder<List<WellnessLog>>(
       stream: fs.streamWellnessLogs(horse.id),
       builder: (context, snapshot) {
-        final logs = (snapshot.data ?? []).reversed.take(20).toList();
+        final logs =
+            (snapshot.data ?? []).reversed.take(20).toList();
+
         if (logs.length < 2) {
           return _ChartCard(
             title: 'Body Condition Score Trend',
-            child: const Center(
-              child: Text('Log at least 2 wellness check-ins to see trend.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey)),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.show_chart,
+                    size: 48,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No data yet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Log at least 2 wellness check-ins\nto see the BCS trend chart.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
+
         final spots = <FlSpot>[];
         for (int i = 0; i < logs.length; i++) {
-          spots.add(FlSpot(i.toDouble(), logs[i].bodyConditionScore.toDouble()));
+          spots.add(FlSpot(
+            i.toDouble(),
+            logs[i].bodyConditionScore.toDouble(),
+          ));
         }
+
         return _ChartCard(
           title: 'Body Condition Score (last ${logs.length} logs)',
           child: LineChart(
@@ -81,7 +112,9 @@ class _BcsChart extends StatelessWidget {
                     reservedSize: 22,
                     getTitlesWidget: (v, _) {
                       final idx = v.toInt();
-                      if (idx >= 0 && idx < logs.length && idx % 4 == 0) {
+                      if (idx >= 0 &&
+                          idx < logs.length &&
+                          idx % 4 == 0) {
                         return Text(
                           DateFormat.Md().format(logs[idx].date),
                           style: const TextStyle(fontSize: 9),
@@ -108,7 +141,8 @@ class _BcsChart extends StatelessWidget {
                   dotData: FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: const Color(0xFF2F5233).withOpacity(0.1),
+                    color: const Color(0xFF2F5233)
+                        .withValues(alpha: 0.1),
                   ),
                 ),
               ],
@@ -132,21 +166,51 @@ class _TrainingChart extends StatelessWidget {
       stream: fs.streamTrainingLogs(horse.id),
       builder: (context, snapshot) {
         final logs = snapshot.data ?? [];
+
         if (logs.isEmpty) {
           return _ChartCard(
             title: 'Training Sessions by Type',
-            child: const Center(
-              child: Text('No training sessions logged yet.',
-                  style: TextStyle(color: Colors.grey)),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.directions_run,
+                    size: 48,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No training sessions yet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Log training sessions in the\nTraining tab to see this chart.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
+
         final typeCounts = <String, int>{};
         for (final l in logs) {
           typeCounts[l.type] = (typeCounts[l.type] ?? 0) + 1;
         }
         final entries = typeCounts.entries.toList();
-        final maxY = typeCounts.values.reduce((a, b) => a > b ? a : b).toDouble() + 1;
+        final maxY = typeCounts.values
+                .reduce((a, b) => a > b ? a : b)
+                .toDouble() +
+            1;
 
         return _ChartCard(
           title: 'Sessions by Type (${logs.length} total)',
@@ -194,14 +258,17 @@ class _TrainingChart extends StatelessWidget {
               ),
               borderData: FlBorderData(show: false),
               barGroups: entries.asMap().entries.map((e) {
-                return BarChartGroupData(x: e.key, barRods: [
-                  BarChartRodData(
-                    toY: e.value.value.toDouble(),
-                    color: const Color(0xFF2F5233),
-                    width: 16,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ]);
+                return BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: e.value.value.toDouble(),
+                      color: const Color(0xFF2F5233),
+                      width: 16,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                );
               }).toList(),
             ),
           ),
@@ -223,14 +290,53 @@ class _AppetiteChart extends StatelessWidget {
       stream: fs.streamWellnessLogs(horse.id),
       builder: (context, snapshot) {
         final logs = snapshot.data ?? [];
-        if (logs.isEmpty) return const SizedBox();
-        final good = logs.where((l) => l.appetite == 'Good').length;
-        final reduced = logs.where((l) => l.appetite == 'Reduced').length;
-        final none = logs.where((l) => l.appetite == 'None').length;
+
+        if (logs.isEmpty) {
+          return _ChartCard(
+            title: 'Appetite Distribution',
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.pie_chart_outline,
+                    size: 48,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No wellness logs yet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Log daily wellness check-ins\nto see appetite distribution.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final good =
+            logs.where((l) => l.appetite == 'Good').length;
+        final reduced =
+            logs.where((l) => l.appetite == 'Reduced').length;
+        final none =
+            logs.where((l) => l.appetite == 'None').length;
         final total = logs.length;
 
         return _ChartCard(
-          title: 'Appetite Distribution (${logs.length} check-ins)',
+          title:
+              'Appetite Distribution (${logs.length} check-ins)',
           child: Row(
             children: [
               Expanded(
@@ -244,7 +350,9 @@ class _AppetiteChart extends StatelessWidget {
                           color: Colors.green,
                           radius: 60,
                           titleStyle: const TextStyle(
-                              fontSize: 11, color: Colors.white),
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
                         ),
                       if (reduced > 0)
                         PieChartSectionData(
@@ -253,7 +361,9 @@ class _AppetiteChart extends StatelessWidget {
                           color: Colors.orange,
                           radius: 60,
                           titleStyle: const TextStyle(
-                              fontSize: 11, color: Colors.white),
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
                         ),
                       if (none > 0)
                         PieChartSectionData(
@@ -262,7 +372,9 @@ class _AppetiteChart extends StatelessWidget {
                           color: Colors.red,
                           radius: 60,
                           titleStyle: const TextStyle(
-                              fontSize: 11, color: Colors.white),
+                            fontSize: 11,
+                            color: Colors.white,
+                          ),
                         ),
                     ],
                     sectionsSpace: 2,
@@ -275,12 +387,21 @@ class _AppetiteChart extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _Legend('Good', Colors.green,
-                      '${(good / total * 100).round()}%'),
-                  _Legend('Reduced', Colors.orange,
-                      '${(reduced / total * 100).round()}%'),
-                  _Legend('None', Colors.red,
-                      '${(none / total * 100).round()}%'),
+                  _Legend(
+                    'Good',
+                    Colors.green,
+                    '${(good / total * 100).round()}%',
+                  ),
+                  _Legend(
+                    'Reduced',
+                    Colors.orange,
+                    '${(reduced / total * 100).round()}%',
+                  ),
+                  _Legend(
+                    'None',
+                    Colors.red,
+                    '${(none / total * 100).round()}%',
+                  ),
                 ],
               ),
             ],
@@ -306,17 +427,23 @@ class _Legend extends StatelessWidget {
           Container(
             width: 12,
             height: 12,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 6),
-          Text('$label: $value', style: const TextStyle(fontSize: 12)),
+          Text(
+            '$label: $value',
+            style: const TextStyle(fontSize: 12),
+          ),
         ],
       ),
     );
   }
 }
 
-// ─── Summary stats ───
+// ─── Wellness Summary ───
 class _WellnessSummary extends StatelessWidget {
   final Horse horse;
   const _WellnessSummary({required this.horse});
@@ -329,17 +456,34 @@ class _WellnessSummary extends StatelessWidget {
       builder: (context, snapshot) {
         final logs = snapshot.data ?? [];
         if (logs.isEmpty) return const SizedBox();
-        final flagged = logs.where((l) => l.flaggedForVet).length;
-        final avgBcs = logs.map((l) => l.bodyConditionScore).reduce((a, b) => a + b) / logs.length;
+
+        final flagged =
+            logs.where((l) => l.flaggedForVet).length;
+        final avgBcs =
+            logs.map((l) => l.bodyConditionScore).reduce(
+                      (a, b) => a + b,
+                    ) /
+                logs.length;
+
         return _ChartCard(
           title: 'Wellness Summary',
           child: Column(
             children: [
               _StatRow('Total check-ins', '${logs.length}'),
-              _StatRow('Avg body condition score', avgBcs.toStringAsFixed(1)),
-              _StatRow('Flagged observations', '$flagged'),
-              _StatRow('Last check-in',
-                  logs.isNotEmpty ? DateFormat.yMMMd().format(logs.first.date) : '—'),
+              _StatRow(
+                'Avg body condition score',
+                avgBcs.toStringAsFixed(1),
+              ),
+              _StatRow(
+                'Flagged observations',
+                '$flagged',
+              ),
+              _StatRow(
+                'Last check-in',
+                logs.isNotEmpty
+                    ? DateFormat.yMMMd().format(logs.first.date)
+                    : '--',
+              ),
             ],
           ),
         );
@@ -361,17 +505,24 @@ class _StatRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
   }
 }
 
+// ─── Reusable chart card wrapper ───
 class _ChartCard extends StatelessWidget {
   final String title;
   final Widget child;
-  const _ChartCard({required this.title, required this.child});
+  const _ChartCard({
+    required this.title,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -381,9 +532,13 @@ class _ChartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(height: 200, child: child),
           ],

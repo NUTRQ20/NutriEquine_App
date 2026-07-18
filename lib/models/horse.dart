@@ -4,14 +4,14 @@ class Horse {
   final String name;
   final String breed;
   final String discipline;
-  final int? ageYears;
-  final double? weightKg;
+  final int? ageYears;        // nullable — not every horse has age set
+  final double? weightKg;     // nullable — not every horse has weight set
   final List<String> goals;
   final List<String> allergies;
   final String? vetName;
   final String? farrierName;
   final String? photoUrl;
-  final List<String> sharedWith; // list of user UIDs with access
+  final List<String> sharedWith;
   final DateTime createdAt;
 
   Horse({
@@ -20,10 +20,10 @@ class Horse {
     required this.name,
     required this.breed,
     required this.discipline,
-    this.ageYears,
-    this.weightKg,
-    this.goals = const [],
-    this.allergies = const [],
+    this.ageYears,             // optional — no required, no default needed
+    this.weightKg,             // optional — no required, no default needed
+    this.goals = const [],     // optional with default
+    this.allergies = const [], // optional with default
     this.vetName,
     this.farrierName,
     this.photoUrl,
@@ -38,8 +38,12 @@ class Horse {
       name: map['name'] ?? '',
       breed: map['breed'] ?? '',
       discipline: map['discipline'] ?? '',
-      ageYears: map['ageYears'],
-      weightKg: (map['weightKg'] as num?)?.toDouble(),
+      ageYears: map['ageYears'] != null
+          ? (map['ageYears'] as num).toInt()
+          : null,
+      weightKg: map['weightKg'] != null
+          ? (map['weightKg'] as num).toDouble()
+          : null,
       goals: List<String>.from(map['goals'] ?? []),
       allergies: List<String>.from(map['allergies'] ?? []),
       vetName: map['vetName'],
@@ -47,7 +51,8 @@ class Horse {
       photoUrl: map['photoUrl'],
       sharedWith: List<String>.from(map['sharedWith'] ?? []),
       createdAt: DateTime.fromMillisecondsSinceEpoch(
-          map['createdAt'] ?? DateTime.now().millisecondsSinceEpoch),
+          map['createdAt'] ??
+              DateTime.now().millisecondsSinceEpoch),
     );
   }
 

@@ -10,8 +10,12 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
+  bool _initialized = false;
+
   Future<void> init() async {
+    if (_initialized) return;
     tz.initializeTimeZones();
+
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -25,6 +29,7 @@ class NotificationService {
     );
     await _plugin.initialize(settings);
     await _createAndroidChannel();
+    _initialized = true;
   }
 
   Future<void> _createAndroidChannel() async {
@@ -34,60 +39,98 @@ class NotificationService {
       description: 'Horse care and supplement reminders',
       importance: Importance.high,
     );
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    try {
+      final impl = _plugin.resolvePlatformSpecificImplementation();
+      if (impl is AndroidFlutterLocalNotificationsPlugin) {
+        await impl.createNotificationChannel(channel);
+      }
+    } catch (_) {}
   }
 
   Future<void> requestPermissions() async {
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(alert: true, badge: true, sound: true);
+    try {
+      final impl = _plugin.resolvePlatformSpecificImplementation();
+      if (impl is AndroidFlutterLocalNotificationsPlugin) {
+        await impl.requestNotificationsPermission();
+        await impl.requestExactAlarmsPermission();
+      } else if (impl is IOSFlutterLocalNotificationsPlugin) {
+        await impl.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (_) {}
   }
 
-  /// Schedule a one-time notification for a care reminder due date.
   Future<void> scheduleReminderNotification({
     required int id,
     required String title,
     required String body,
     required DateTime scheduledDate,
   }) async {
-    if (scheduledDate.isBefore(DateTime.now())) return;
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tz.TZDateTime.from(
-          scheduledDate.subtract(const Duration(hours: 24)), tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'nutriequine_channel',
-          'NutriEquine Reminders',
-          channelDescription: 'Horse care and supplement reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+    if (!_initialized) await init();
+
+    final notifyAt =
+        scheduledDate.subtract(const Duration(hours: 24));
+    if (notifyAt.isBefore(DateTime.now())) return;
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(notifyAt, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nutriequine_channel',
+            'NutriEquine Reminders',
+            channelDescription:
+                'Horse care and supplement reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+        androidScheduleMode:
+            AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      try {
+        await _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tz.TZDateTime.from(notifyAt, tz.local),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'nutriequine_channel',
+              'NutriEquine Reminders',
+              channelDescription:
+                  'Horse care and supplement reminders',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+          androidScheduleMode:
+              AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (_) {}
+    }
   }
 
-  /// Show an immediate notification (e.g. low stock alert).
   Future<void> showInstantNotification({
     required int id,
     required String title,
     required String body,
   }) async {
+    if (!_initialized) await init();
     await _plugin.show(
       id,
       title,
@@ -96,7 +139,8 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'nutriequine_channel',
           'NutriEquine Reminders',
-          channelDescription: 'Horse care and supplement reminders',
+          channelDescription:
+              'Horse care and supplement reminders',
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
@@ -106,7 +150,8 @@ class NotificationService {
     );
   }
 
-  Future<void> cancelNotification(int id) => _plugin.cancel(id);
+  Future<void> cancelNotification(int id) =>
+      _plugin.cancel(id);
 
   Future<void> cancelAll() => _plugin.cancelAll();
 }

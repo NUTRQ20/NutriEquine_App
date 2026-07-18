@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/barn_task.dart';
+import '../models/horse.dart';
 import '../services/firestore_service.dart';
 
 class BarnTasksScreen extends StatelessWidget {
@@ -10,62 +11,91 @@ class BarnTasksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fs = context.read<FirestoreService>();
+
     return StreamBuilder<List<BarnTask>>(
       stream: fs.streamAllBarnTasks(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final tasks = snapshot.data ?? [];
-        final pending = tasks.where((t) => !t.isComplete).toList();
-        final done = tasks.where((t) => t.isComplete).toList();
+      builder: (context, taskSnap) {
+        return StreamBuilder<List<Horse>>(
+          stream: fs.streamHorses(),
+          builder: (context, horseSnap) {
+            if (taskSnap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        if (tasks.isEmpty) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.checklist, size: 64, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text('No barn tasks yet.'),
-                  Text(
-                    'Assign tasks from inside each horse\'s detail screen → Barn Tasks tab.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+            final tasks = taskSnap.data ?? [];
+            final horses = horseSnap.data ?? [];
+
+            // Build horse name lookup map
+            final horseNames = <String, String>{
+              for (final h in horses) h.id: h.name
+            };
+
+            final pending =
+                tasks.where((t) => !t.isComplete).toList();
+            final done =
+                tasks.where((t) => t.isComplete).toList();
+
+            if (tasks.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.checklist,
+                          size: 64, color: Colors.grey),
+                      SizedBox(height: 12),
+                      Text('No barn tasks yet.',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      Text(
+                        'Assign tasks from inside each horse\'s\ndetail screen → Barn Tasks tab.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          );
-        }
+                ),
+              );
+            }
 
-        return ListView(
-          children: [
-            if (pending.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text('PENDING',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        fontSize: 12)),
-              ),
-              ...pending.map((t) => _TaskCard(task: t, fs: fs)),
-            ],
-            if (done.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text('COMPLETED',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        fontSize: 12)),
-              ),
-              ...done.map((t) => _TaskCard(task: t, fs: fs)),
-            ],
-          ],
+            return ListView(
+              children: [
+                if (pending.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('PENDING',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            fontSize: 12)),
+                  ),
+                  ...pending.map((t) => _TaskCard(
+                        task: t,
+                        horseName: horseNames[t.horseId] ?? 'Unknown horse',
+                        fs: fs,
+                      )),
+                ],
+                if (done.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('COMPLETED',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            fontSize: 12)),
+                  ),
+                  ...done.map((t) => _TaskCard(
+                        task: t,
+                        horseName: horseNames[t.horseId] ?? 'Unknown horse',
+                        fs: fs,
+                      )),
+                ],
+              ],
+            );
+          },
         );
       },
     );
@@ -74,8 +104,14 @@ class BarnTasksScreen extends StatelessWidget {
 
 class _TaskCard extends StatelessWidget {
   final BarnTask task;
+  final String horseName;
   final FirestoreService fs;
-  const _TaskCard({required this.task, required this.fs});
+
+  const _TaskCard({
+    required this.task,
+    required this.horseName,
+    required this.fs,
+  });
 
   static const Map<String, IconData> _categoryIcons = {
     'Feeding': Icons.grass,
@@ -96,18 +132,27 @@ class _TaskCard extends StatelessWidget {
       color: overdue ? Colors.red.shade50 : null,
       child: CheckboxListTile(
         value: task.isComplete,
-        onChanged: (_) => fs.completeBarnTask(task.id),
+        onChanged: (_) {
+          if (task.isComplete) {
+            fs.uncompleteBarnTask(task.id);
+          } else {
+            fs.completeBarnTask(task.id);
+          }
+        },
         title: Text(
           task.title,
           style: TextStyle(
-              decoration:
-                  task.isComplete ? TextDecoration.lineThrough : null,
-              fontWeight: overdue ? FontWeight.bold : null),
+            decoration:
+                task.isComplete ? TextDecoration.lineThrough : null,
+            fontWeight: overdue ? FontWeight.bold : null,
+          ),
         ),
         subtitle: Text(
-          '${task.category} · ${task.assignedTo.isNotEmpty ? "→ ${task.assignedTo}" : "Unassigned"}\nDue ${DateFormat.yMMMd().format(task.dueDate)}'
-          '${overdue ? " · OVERDUE" : ""}'
-          '${task.notes != null ? "\n${task.notes}" : ""}',
+          // Shows horse name clearly
+          '🐴 $horseName\n'
+          '${task.category} · ${task.assignedTo.isNotEmpty ? "→ ${task.assignedTo}" : "Unassigned"}\n'
+          'Due ${DateFormat.yMMMd().format(task.dueDate)}'
+          '${overdue && !task.isComplete ? " · OVERDUE" : ""}',
         ),
         isThreeLine: true,
         secondary: Icon(

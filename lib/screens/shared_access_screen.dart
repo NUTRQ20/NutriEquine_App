@@ -98,12 +98,14 @@ class _SharedAccessScreenState extends State<SharedAccessScreen> {
 
       await fs.shareHorseWithUser(widget.horse.id, targetUid);
 
+// Reload horse document from Firestore to get fresh sharedWith list
+      await _loadSharedEmails();
+
       setState(() {
         _sharedEmails[targetUid] = email;
-        _success =
-            '✅ "${widget.horse.name}" is now shared with $email.\n'
-            'They will see this horse the next time they open their app.';
-        _emailCtrl.clear();
+        _success = '✅ "${widget.horse.name}" is now shared with $email.\n'
+      'They will see this horse the next time they open their app.';
+      _emailCtrl.clear();
       });
     } catch (e) {
       setState(() => _error = 'Something went wrong: $e');

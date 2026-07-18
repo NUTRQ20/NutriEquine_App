@@ -200,17 +200,19 @@ class _SupplementProtocolScreenState
         const SizedBox(height: 16),
         Expanded(
           child: ListView(
-            children: _disciplines
-                .map((d) => RadioListTile<String>(
-                      value: d,
-                      groupValue: _discipline,
-                      title: Text(d),
-                      onChanged: (v) =>
-                          setState(() => _discipline = v),
-                    ))
-                .toList(),
-          ),
+            children: _disciplines.map((d) {
+              return ListTile(
+                title: Text(d),
+                leading: Radio<String>(
+                    value: d,
+                    groupValue: _discipline,
+          onChanged: (v) => setState(() => _discipline = v),
         ),
+        onTap: () => setState(() => _discipline = d),
+      );
+    }).toList(),
+  ),
+),
         FilledButton(
           onPressed: _discipline != null ? _next : null,
           child: const Text('Next'),

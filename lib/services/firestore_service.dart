@@ -16,34 +16,35 @@ class FirestoreService {
       _db.collection('horses');
 
   Stream<List<Horse>> streamHorses() {
-    if (uid.isEmpty) return Stream.value([]);
-    return _horses
-        .where('ownerId', isEqualTo: uid)
-        .snapshots()
-        .asyncMap((ownedSnap) async {
-      final owned = ownedSnap.docs
-          .map((d) => Horse.fromMap(d.id, d.data()))
-          .toList();
-      try {
-        final sharedSnap = await _horses
-            .where('sharedWith', arrayContains: uid)
-            .get();
-        final shared = sharedSnap.docs
-            .map((d) => Horse.fromMap(d.id, d.data()))
-            .toList();
-        final seen = <String>{};
-        final all = <Horse>[];
-        for (final h in [...owned, ...shared]) {
-          if (seen.add(h.id)) all.add(h);
-        }
-        all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return all;
-      } catch (_) {
-        owned.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return owned;
+  if (uid.isEmpty) return Stream.value([]);
+
+  // Stream 1: owned horses
+  final ownedStream = _horses
+      .where('ownerId', isEqualTo: uid)
+      .snapshots()
+      .map((snap) =>
+          snap.docs.map((d) => Horse.fromMap(d.id, d.data())).toList());
+
+  // Stream 2: shared horses
+  final sharedStream = _horses
+      .where('sharedWith', arrayContains: uid)
+      .snapshots()
+      .map((snap) =>
+          snap.docs.map((d) => Horse.fromMap(d.id, d.data())).toList());
+
+  // Combine both streams reliably
+  return ownedStream.asyncExpand((owned) {
+    return sharedStream.map((shared) {
+      final seen = <String>{};
+      final all = <Horse>[];
+      for (final h in [...owned, ...shared]) {
+        if (seen.add(h.id)) all.add(h);
       }
+      all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return all;
     });
-  }
+  });
+}
 
   Future<String> addHorse(Horse horse) async {
     final doc = await _horses.add(horse.toMap());
@@ -272,4 +273,16 @@ class FirestoreService {
     results['barn_tasks'] = await fetch(_barnTasks, 'ownerId');
     return results;
   }
+
+  /// Stream ALL training logs for current user (used by calendar)
+Stream<List<TrainingLog>> streamAllTrainingLogs() {
+  if (uid.isEmpty) return Stream.value([]);
+  return _training
+      .where('ownerId', isEqualTo: uid)
+      .snapshots()
+      .map((snap) => snap.docs
+          .map((d) => TrainingLog.fromMap(d.id, d.data()))
+          .toList());
+}
+
 }

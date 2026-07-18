@@ -209,9 +209,17 @@ class _InfoTile extends StatelessWidget {
 }
 
 // ─────────────────────────── FEED PLAN TAB ───────────────────────────
-class _FeedPlanTab extends StatelessWidget {
+// ─────────────────────────── FEED PLAN TAB ───────────────────────────
+class _FeedPlanTab extends StatefulWidget {
   final Horse horse;
   const _FeedPlanTab({required this.horse});
+  @override
+  State<_FeedPlanTab> createState() => _FeedPlanTabState();
+}
+
+class _FeedPlanTabState extends State<_FeedPlanTab> {
+  // Track which entries were just marked given for instant UI feedback
+  final Set<String> _justMarked = {};
 
   void _addFeedEntry(BuildContext context) {
     final itemCtrl = TextEditingController();
@@ -225,7 +233,7 @@ class _FeedPlanTab extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => Padding(
+        builder: (ctx, setSheetState) => Padding(
           padding: EdgeInsets.only(
             left: 16, right: 16, top: 16,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
@@ -238,13 +246,15 @@ class _FeedPlanTab extends StatelessWidget {
                   style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 12),
               TextField(
-                  controller: itemCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Item name (e.g. NutriEquine GutCare)')),
+                controller: itemCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Item name (e.g. NutriEquine GutCare)'),
+              ),
               TextField(
-                  controller: dosageCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Dosage (e.g. 1 scoop)')),
+                controller: dosageCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Dosage (e.g. 1 scoop)'),
+              ),
               TextField(
                 controller: daysCtrl,
                 keyboardType: TextInputType.number,
@@ -258,14 +268,14 @@ class _FeedPlanTab extends StatelessWidget {
                         DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
                 onChanged: (v) =>
-                    setState(() => timeOfDay = v ?? 'AM'),
+                    setSheetState(() => timeOfDay = v ?? 'AM'),
                 decoration:
                     const InputDecoration(labelText: 'Time of day'),
               ),
               SwitchListTile(
                 value: isSupplement,
                 onChanged: (v) =>
-                    setState(() => isSupplement = v),
+                    setSheetState(() => isSupplement = v),
                 title: const Text('This is a NutriEquine supplement'),
                 contentPadding: EdgeInsets.zero,
               ),
@@ -276,7 +286,7 @@ class _FeedPlanTab extends StatelessWidget {
                   final days = int.tryParse(daysCtrl.text.trim());
                   final entry = FeedEntry(
                     id: const Uuid().v4(),
-                    horseId: horse.id,
+                    horseId: widget.horse.id,
                     ownerId: fs.uid,
                     itemName: itemCtrl.text.trim(),
                     dosage: dosageCtrl.text.trim(),
@@ -302,18 +312,22 @@ class _FeedPlanTab extends StatelessWidget {
     final fs = context.read<FirestoreService>();
     return Scaffold(
       body: StreamBuilder<List<FeedEntry>>(
-        stream: fs.streamFeedEntries(horse.id),
+        stream: fs.streamFeedEntries(widget.horse.id),
         builder: (context, snapshot) {
           final entries = snapshot.data ?? [];
           if (entries.isEmpty) {
             return const Center(
-                child: Text(
-                    'No feed or supplement entries yet.\nTap + to add one.',
-                    textAlign: TextAlign.center));
+              child: Text(
+                'No feed or supplement entries yet.\nTap + to add one.',
+                textAlign: TextAlign.center,
+              ),
+            );
           }
           return ListView(
             children: entries.map((e) {
               final lowStock = e.isLowStock;
+              final justMarked = _justMarked.contains(e.id);
+
               return Card(
                 color: lowStock ? Colors.orange.shade50 : null,
                 child: ListTile(
@@ -321,22 +335,27 @@ class _FeedPlanTab extends StatelessWidget {
                     e.isSupplement ? Icons.science : Icons.grass,
                     color: lowStock ? Colors.orange : null,
                   ),
-                  title: Text('${e.itemName} - ${e.dosage}'),
+                  title: Text('${e.itemName} — ${e.dosage}'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          '${e.timeOfDay}${e.lastGivenAt != null ? " - last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}'),
+                        justMarked
+                            ? '${e.timeOfDay} · just given ✅'
+                            : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
+                      ),
                       if (e.daysRemaining != null)
                         Text(
-                          '${e.daysRemaining} days remaining${lowStock ? " - REORDER SOON" : ""}',
+                          '${e.daysRemaining} days remaining'
+                          '${lowStock ? " · REORDER SOON" : ""}',
                           style: TextStyle(
-                              color: lowStock
-                                  ? Colors.orange.shade800
-                                  : null,
-                              fontWeight: lowStock
-                                  ? FontWeight.bold
-                                  : null),
+                            color: lowStock
+                                ? Colors.orange.shade800
+                                : null,
+                            fontWeight: lowStock
+                                ? FontWeight.bold
+                                : null,
+                          ),
                         ),
                     ],
                   ),
@@ -345,9 +364,19 @@ class _FeedPlanTab extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.check_circle_outline),
+                        icon: Icon(
+                          justMarked
+                              ? Icons.check_circle
+                              : Icons.check_circle_outline,
+                          color: justMarked
+                              ? Colors.green
+                              : null,
+                        ),
                         tooltip: 'Mark given',
                         onPressed: () async {
+                          // Instant UI feedback
+                          setState(() =>
+                              _justMarked.add(e.id));
                           await fs.markFeedGiven(e.id);
                           if (e.daysRemaining != null &&
                               e.daysRemaining! > 0) {
@@ -358,9 +387,10 @@ class _FeedPlanTab extends StatelessWidget {
                             await NotificationService()
                                 .showInstantNotification(
                               id: e.id.hashCode,
-                              title: 'Low Stock: ${e.itemName}',
+                              title:
+                                  'Low Stock: ${e.itemName}',
                               body:
-                                  'Only ${e.daysRemaining} days remaining - time to reorder.',
+                                  'Only ${e.daysRemaining} days remaining — time to reorder.',
                             );
                           }
                         },
@@ -369,13 +399,18 @@ class _FeedPlanTab extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.refresh),
                           tooltip: 'Reset inventory',
-                          onPressed: () =>
-                              fs.resetInventory(e.id, e.daysOfSupply!),
+                          onPressed: () {
+                            setState(() =>
+                                _justMarked.remove(e.id));
+                            fs.resetInventory(
+                                e.id, e.daysOfSupply!);
+                          },
                         ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         tooltip: 'Delete',
-                        onPressed: () => fs.deleteFeedEntry(e.id),
+                        onPressed: () =>
+                            fs.deleteFeedEntry(e.id),
                       ),
                     ],
                   ),
@@ -392,7 +427,6 @@ class _FeedPlanTab extends StatelessWidget {
     );
   }
 }
-
 // ─────────────────────────── WELLNESS TAB ───────────────────────────
 class _WellnessTab extends StatelessWidget {
   final Horse horse;
