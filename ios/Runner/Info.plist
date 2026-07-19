@@ -68,3 +68,12 @@
 	</array>
 </dict>
 </plist>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>com.googleusercontent.apps.379017038335-k0m7u43tpar7fm2547j8j6bm4ij4tdq9</string>
+    </array>
+  </dict>
+</array>
