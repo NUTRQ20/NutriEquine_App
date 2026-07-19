@@ -1,0 +1,4 @@
+storePassword=Yash@123
+keyPassword=Yash@123
+keyAlias=nutriequine
+storeFile=C:/Users/Yash/nutriequine_key.jks

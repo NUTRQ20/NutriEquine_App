@@ -41,6 +41,10 @@ dependencies:
   # New — offline/connectivity detection
   connectivity_plus: ^6.0.5
 
+  # New — social sign-in
+  google_sign_in: ^6.2.2
+  flutter_facebook_auth: ^7.1.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

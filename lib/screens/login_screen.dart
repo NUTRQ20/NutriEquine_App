@@ -23,7 +23,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final auth = context.read<AuthService>();
     try {
       if (_isSignUp) {
@@ -41,6 +44,62 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = _friendlyError(e.code));
     } catch (e) {
       setState(() => _error = 'Something went wrong. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final auth = context.read<AuthService>();
+    try {
+      final credential = await auth.signInWithGoogle();
+      if (credential == null) {
+        // User cancelled the Google account picker — not an error.
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      if (mounted) {
+        context.read<FirestoreService>().registerUserEmail();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = _friendlyError(e.code));
+    } catch (e) {
+      setState(() => _error = 'Google sign-in failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submitFacebook() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final auth = context.read<AuthService>();
+    try {
+      final credential = await auth.signInWithFacebook();
+      if (credential == null) {
+        // User cancelled the Facebook login dialog — not an error.
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      if (mounted) {
+        context.read<FirestoreService>().registerUserEmail();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = _friendlyError(e.code));
+    } catch (e) {
+      setState(() => _error = 'Facebook sign-in failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -95,8 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: const Color(0xFF2F5233),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(Icons.pets,
-                        size: 44, color: Colors.white),
+                    child:
+                        const Icon(Icons.pets, size: 44, color: Colors.white),
                   ),
                   Text(
                     'NutriEquine',
@@ -108,9 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _isSignUp
-                        ? 'Create your account'
-                        : 'Sign in to continue',
+                    _isSignUp ? 'Create your account' : 'Sign in to continue',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.grey),
                   ),
@@ -179,8 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Expanded(
                               child: Text(_error!,
                                   style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 13))),
+                                      color: Colors.red, fontSize: 13))),
                         ],
                       ),
                     ),
@@ -200,17 +256,67 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white))
-                        : Text(
-                            _isSignUp ? 'Create account' : 'Sign in',
+                                strokeWidth: 2, color: Colors.white))
+                        : Text(_isSignUp ? 'Create account' : 'Sign in',
                             style: const TextStyle(fontSize: 16)),
+                  ),
+                  const SizedBox(height: 16),
+                  // Divider
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('OR',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12)),
+                      ),
+                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Google sign-in
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _submitGoogle,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.g_mobiledata,
+                        size: 28, color: Color(0xFF2F5233)),
+                    label: const Text(
+                      'Continue with Google',
+                      style: TextStyle(fontSize: 15, color: Colors.black87),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Facebook sign-in
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : _submitFacebook,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.facebook,
+                        size: 24, color: Color(0xFF1877F2)),
+                    label: const Text(
+                      'Continue with Facebook',
+                      style: TextStyle(fontSize: 15, color: Colors.black87),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   // Toggle
                   TextButton(
-                    onPressed: () =>
-                        setState(() { _isSignUp = !_isSignUp; _error = null; }),
+                    onPressed: () => setState(() {
+                      _isSignUp = !_isSignUp;
+                      _error = null;
+                    }),
                     child: Text(_isSignUp
                         ? 'Already have an account? Sign in'
                         : 'New here? Create an account'),
