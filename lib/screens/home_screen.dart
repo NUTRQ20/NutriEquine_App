@@ -6,8 +6,8 @@ import 'calendar_screen.dart';
 import 'barn_tasks_screen.dart';
 import 'education_hub_screen.dart';
 import 'premium_screen.dart';
-import 'firebase_data_screen.dart';
 import 'login_screen.dart';
+import 'user_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,23 +68,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.storage),
-            tooltip: 'View Firebase data',
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(
-                    builder: (_) => const FirebaseDataScreen())),
-          ),
-          IconButton(
             icon: const Icon(Icons.star_outline),
             tooltip: 'Go Premium',
             onPressed: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const PremiumScreen())),
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: _signOut,
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'My Profile',
+          onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (_) => const UserProfileScreen()),
           ),
+         ),
         ],
       ),
       body: IndexedStack(index: _index, children: _pages),

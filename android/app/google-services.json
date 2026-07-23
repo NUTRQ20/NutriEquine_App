@@ -12,7 +12,28 @@
           "package_name": "com.example.nutriequine_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "379017038335-cd7q8lpfn9rgs37bp1hi40b45itt5340.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nutriequine_app",
+            "certificate_hash": "6ba17ebd2f4f69d0da1bad92f9ab63f059c4f75f"
+          }
+        },
+        {
+          "client_id": "379017038335-pqqd7f5lk8g0osobmeg38slope67qvq7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nutriequine_app",
+            "certificate_hash": "6d754d5a050693c13a567a6ec09f082e3cf414f9"
+          }
+        },
+        {
+          "client_id": "379017038335-d3fvd77btm6qn7tgne6em0cmvq0hhpjs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCZyuFFjvvCI5LMUyKeS_ctY2lcfkbFN2A"
@@ -20,7 +41,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "379017038335-d3fvd77btm6qn7tgne6em0cmvq0hhpjs.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "379017038335-k0m7u43tpar7fm2547j8j6bm4ij4tdq9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nutriequineApp"
+              }
+            }
+          ]
         }
       }
     }

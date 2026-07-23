@@ -18,16 +18,25 @@ class AuthService {
   /// Signs in with a Google account and links it to Firebase Auth.
   /// Returns null if the user cancels the Google account picker.
   Future<UserCredential?> signInWithGoogle() async {
-    final googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) return null; // user cancelled the picker
+  // Force account picker to show every time
+  // by signing out of Google first
+  final googleSignIn = GoogleSignIn();
+  await googleSignIn.signOut();
 
-    final googleAuth = await googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    return _auth.signInWithCredential(credential);
-  }
+  // Now show the account picker
+  final googleUser = await googleSignIn.signIn();
+  if (googleUser == null) return null; // user cancelled
+
+  final googleAuth = await googleUser.authentication;
+
+  final credential = GoogleAuthProvider.credential(
+    accessToken: googleAuth.accessToken,
+    idToken: googleAuth.idToken,
+  );
+
+  return await FirebaseAuth.instance
+      .signInWithCredential(credential);
+}
 
   /// Signs in with a Facebook account and links it to Firebase Auth.
   /// Returns null if the user cancels the Facebook login dialog.

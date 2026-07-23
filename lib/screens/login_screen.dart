@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import 'home_screen.dart';
+import 'user_details_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() =>
+      _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -21,29 +24,71 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePass = true;
   String? _error;
 
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _routeAfterAuth() async {
+    if (!mounted) return;
+
+    // Register email in Firestore
+    context.read<FirestoreService>().registerUserEmail();
+
+    // Check if profile already completed
+    final prefs = await SharedPreferences.getInstance();
+    final profileCompleted =
+        prefs.getBool('profile_completed') ?? false;
+
+    if (!mounted) return;
+
+    if (!profileCompleted) {
+      // First time — go to user details screen
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) => const UserDetailsScreen()),
+        (_) => false,
+      );
+    } else {
+      // Returning user — go to home
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (_) => const HomeScreen()),
+        (_) => false,
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
       _error = null;
     });
+
     final auth = context.read<AuthService>();
+
     try {
       if (_isSignUp) {
-        await auth.signUp(_emailCtrl.text.trim(), _passCtrl.text.trim());
+        await auth.signUp(
+          _emailCtrl.text.trim(),
+          _passCtrl.text.trim(),
+        );
       } else {
-        await auth.signIn(_emailCtrl.text.trim(), _passCtrl.text.trim());
-      }
-      if (mounted) {
-        context.read<FirestoreService>().registerUserEmail();
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        await auth.signIn(
+          _emailCtrl.text.trim(),
+          _passCtrl.text.trim(),
         );
       }
+
+      await _routeAfterAuth();
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _friendlyError(e.code));
     } catch (e) {
-      setState(() => _error = 'Something went wrong. Please try again.');
+      setState(() =>
+          _error = 'Something went wrong. Try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -62,16 +107,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) setState(() => _loading = false);
         return;
       }
-      if (mounted) {
-        context.read<FirestoreService>().registerUserEmail();
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
+      await _routeAfterAuth();
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _friendlyError(e.code));
     } catch (e) {
-      setState(() => _error = 'Google sign-in failed. Please try again.');
+      setState(() =>
+          _error = 'Google sign-in failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -90,16 +131,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) setState(() => _loading = false);
         return;
       }
-      if (mounted) {
-        context.read<FirestoreService>().registerUserEmail();
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
+      await _routeAfterAuth();
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _friendlyError(e.code));
     } catch (e) {
-      setState(() => _error = 'Facebook sign-in failed. Please try again.');
+      setState(() =>
+          _error = 'Facebook sign-in failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -118,17 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'network-request-failed':
-        return 'No internet connection. Please check your network.';
+        return 'No internet connection.';
       default:
         return 'Authentication failed. Please try again.';
     }
-  }
-
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    super.dispose();
   }
 
   @override
@@ -143,46 +173,59 @@ class _LoginScreenState extends State<LoginScreen> {
               key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment:
+                    CrossAxisAlignment.stretch,
                 children: [
                   // Logo
                   Container(
                     width: 80,
                     height: 80,
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: const EdgeInsets.only(
+                        bottom: 16),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2F5233),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(20),
                     ),
-                    child:
-                        const Icon(Icons.pets, size: 44, color: Colors.white),
+                    child: const Icon(Icons.pets,
+                        size: 44,
+                        color: Colors.white),
                   ),
                   Text(
-                    'NutriEquine',
+                    'EquineEdge',
                     textAlign: TextAlign.center,
                     style: Theme.of(context)
                         .textTheme
                         .headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                        ?.copyWith(
+                            fontWeight:
+                                FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _isSignUp ? 'Create your account' : 'Sign in to continue',
+                    _isSignUp
+                        ? 'Create your account'
+                        : 'Sign in to continue',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
+                    style: const TextStyle(
+                        color: Colors.grey),
                   ),
                   const SizedBox(height: 32),
+
                   // Email
                   TextFormField(
                     controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
+                    keyboardType:
+                        TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: 'Email address',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email_outlined),
+                      prefixIcon:
+                          Icon(Icons.email_outlined),
                     ),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
+                      if (v == null ||
+                          v.trim().isEmpty) {
                         return 'Please enter your email';
                       }
                       if (!v.contains('@')) {
@@ -192,20 +235,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
+
                   // Password
                   TextFormField(
                     controller: _passCtrl,
                     obscureText: _obscurePass,
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.lock_outlined),
+                      border:
+                          const OutlineInputBorder(),
+                      prefixIcon:
+                          const Icon(Icons.lock_outlined),
                       suffixIcon: IconButton(
                         icon: Icon(_obscurePass
                             ? Icons.visibility_off
                             : Icons.visibility),
-                        onPressed: () =>
-                            setState(() => _obscurePass = !_obscurePass),
+                        onPressed: () => setState(() =>
+                            _obscurePass =
+                                !_obscurePass),
                       ),
                     ),
                     validator: (v) {
@@ -218,6 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
+
                   // Error
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -225,101 +273,159 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade200),
+                        borderRadius:
+                            BorderRadius.circular(8),
+                        border: Border.all(
+                            color:
+                                Colors.red.shade200),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              color: Colors.red, size: 18),
+                          const Icon(
+                              Icons.error_outline,
+                              color: Colors.red,
+                              size: 18),
                           const SizedBox(width: 8),
                           Expanded(
-                              child: Text(_error!,
-                                  style: const TextStyle(
-                                      color: Colors.red, fontSize: 13))),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 13),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ],
+
                   const SizedBox(height: 20),
-                  // Submit button
+
+                  // Submit
                   FilledButton(
-                    onPressed: _loading ? null : _submit,
+                    onPressed:
+                        _loading ? null : _submit,
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding:
+                          const EdgeInsets.symmetric(
+                              vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(12),
                       ),
                     ),
                     child: _loading
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : Text(_isSignUp ? 'Create account' : 'Sign in',
-                            style: const TextStyle(fontSize: 16)),
+                            child:
+                                CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _isSignUp
+                                ? 'Create account'
+                                : 'Sign in',
+                            style: const TextStyle(
+                                fontSize: 16),
+                          ),
                   ),
+
                   const SizedBox(height: 16),
+
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(
+                          child: Divider(
+                              color:
+                                  Colors.grey.shade300)),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding:
+                            const EdgeInsets.symmetric(
+                                horizontal: 12),
                         child: Text('OR',
                             style: TextStyle(
-                                color: Colors.grey.shade500, fontSize: 12)),
+                                color:
+                                    Colors.grey.shade500,
+                                fontSize: 12)),
                       ),
-                      Expanded(child: Divider(color: Colors.grey.shade300)),
+                      Expanded(
+                          child: Divider(
+                              color:
+                                  Colors.grey.shade300)),
                     ],
                   ),
                   const SizedBox(height: 16),
+
                   // Google sign-in
                   OutlinedButton.icon(
-                    onPressed: _loading ? null : _submitGoogle,
+                    onPressed:
+                        _loading ? null : _submitGoogle,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: Colors.grey.shade300),
+                      padding:
+                          const EdgeInsets.symmetric(
+                              vertical: 14),
+                      side: BorderSide(
+                          color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(12),
                       ),
                     ),
                     icon: const Icon(Icons.g_mobiledata,
-                        size: 28, color: Color(0xFF2F5233)),
+                        size: 28,
+                        color: Color(0xFF2F5233)),
                     label: const Text(
                       'Continue with Google',
-                      style: TextStyle(fontSize: 15, color: Colors.black87),
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87),
                     ),
                   ),
                   const SizedBox(height: 12),
+
                   // Facebook sign-in
                   OutlinedButton.icon(
-                    onPressed: _loading ? null : _submitFacebook,
+                    onPressed:
+                        _loading ? null : _submitFacebook,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: Colors.grey.shade300),
+                      padding:
+                          const EdgeInsets.symmetric(
+                              vertical: 14),
+                      side: BorderSide(
+                          color: Colors.grey.shade300),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius:
+                            BorderRadius.circular(12),
                       ),
                     ),
                     icon: const Icon(Icons.facebook,
-                        size: 24, color: Color(0xFF1877F2)),
+                        size: 24,
+                        color: Color(0xFF1877F2)),
                     label: const Text(
                       'Continue with Facebook',
-                      style: TextStyle(fontSize: 15, color: Colors.black87),
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87),
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   // Toggle
                   TextButton(
                     onPressed: () => setState(() {
                       _isSignUp = !_isSignUp;
                       _error = null;
                     }),
-                    child: Text(_isSignUp
-                        ? 'Already have an account? Sign in'
-                        : 'New here? Create an account'),
+                    child: Text(
+                      _isSignUp
+                          ? 'Already have an account? Sign in'
+                          : 'New here? Create an account',
+                    ),
                   ),
                 ],
               ),

@@ -86,6 +86,21 @@ class FirestoreService {
     } catch (_) {}
   }
 
+  Future<void> saveUserProfile(Map<String, dynamic> data) async {
+  if (uid.isEmpty) return;
+  await _users.doc(uid).set(data, SetOptions(merge: true));
+}
+
+Future<Map<String, dynamic>?> getUserProfile() async {
+  if (uid.isEmpty) return null;
+  try {
+    final doc = await _users.doc(uid).get();
+    if (doc.exists) return doc.data();
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
   Future<String?> findUidByEmail(String email) async {
     final normalizedEmail = email.toLowerCase().trim();
     try {
