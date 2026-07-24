@@ -18,9 +18,9 @@ android {
     signingConfigs {
     create("release") {
         keyAlias = "nutriequine"
-        keyPassword = "Nutri#Equine#123"
-        storeFile = file("C:/Users/MRUNAL/nutriequine_key.jks")
-        storePassword = "Nutri#Equine#123"
+        keyPassword = "Ram@2006"
+        storeFile = file("C:/Users/Welcome/nutriequine_key.jks")
+        storePassword = "Ram@2006"
         }
     }
 
