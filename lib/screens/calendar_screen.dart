@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/care_models.dart';
 import '../models/training_log.dart';
 import '../models/barn_task.dart';
+import '../models/horse.dart';
 import '../services/firestore_service.dart';
 
 class CalendarEvent {
@@ -42,6 +43,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<CareReminder> _reminders = [];
   List<TrainingLog> _trainingSessions = [];
   List<BarnTask> _barnTasks = [];
+  // horseId → horseName lookup
+  Map<String, String> _horseNames = {};
 
   DateTime _normalize(DateTime dt) =>
       DateTime(dt.year, dt.month, dt.day);
@@ -52,8 +55,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     for (final r in _reminders) {
       if (_normalize(r.dueDate) == normalized) {
+        final horseName = _horseNames[r.horseId] ?? '';
+        final title = horseName.isNotEmpty
+            ? '${r.title} — $horseName'
+            : r.title;
         events.add(CalendarEvent(
-          title: r.title,
+          title: title,
           type: 'reminder',
           color: _reminderColor(r.category),
           icon: _reminderIcon(r.category),
@@ -63,8 +70,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
     for (final t in _trainingSessions) {
       if (_normalize(t.date) == normalized) {
+        final horseName = _horseNames[t.horseId] ?? '';
+        final title = horseName.isNotEmpty
+            ? '${t.type} — $horseName (${t.durationMinutes}min)'
+            : '${t.type} - ${t.durationMinutes}min';
         events.add(CalendarEvent(
-          title: '${t.type} - ${t.durationMinutes}min',
+          title: title,
           type: 'training',
           color: Colors.purple,
           icon: Icons.directions_run,
@@ -74,8 +85,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
     for (final b in _barnTasks) {
       if (_normalize(b.dueDate) == normalized) {
+        final horseName = _horseNames[b.horseId] ?? '';
+        final title = horseName.isNotEmpty
+            ? '${b.title} — $horseName'
+            : b.title;
         events.add(CalendarEvent(
-          title: b.title,
+          title: title,
           type: 'barn_task',
           color: Colors.teal,
           icon: Icons.checklist,
@@ -287,7 +302,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     final fs = context.read<FirestoreService>();
 
-    return StreamBuilder<List<CareReminder>>(
+    return StreamBuilder<List<Horse>>(
+      stream: fs.streamHorses(),
+      builder: (context, horseSnap) {
+        if (horseSnap.hasData) {
+          _horseNames = {
+            for (final h in horseSnap.data!) h.id: h.name
+          };
+        }
+        return StreamBuilder<List<CareReminder>>(
       stream: fs.streamAllReminders(),
       builder: (context, reminderSnap) {
         if (reminderSnap.hasData) {
@@ -597,6 +620,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           },
         );
       },
+    );
+      }, // close horse StreamBuilder
     );
   }
 }

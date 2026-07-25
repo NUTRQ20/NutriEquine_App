@@ -10,6 +10,8 @@ import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/premium_service.dart';
 import 'screens/splash_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'services/feed_auto_update_service.dart';
 
 Future<void> main() async {
   // Ensure Flutter engine is ready before anything else
@@ -38,6 +40,15 @@ Future<void> main() async {
     await NotificationService().requestPermissions();
   } catch (e) {
     debugPrint('Notification init error: $e');
+  }
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FeedAutoUpdateService().runDailyCheck();
+    }
+  } catch (e) {
+    debugPrint('Feed auto update error: $e');
   }
 
   runApp(const NutriEquineApp());
