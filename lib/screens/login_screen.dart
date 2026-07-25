@@ -118,30 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _submitFacebook() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final auth = context.read<AuthService>();
-    try {
-      final credential = await auth.signInWithFacebook();
-      if (credential == null) {
-        // User cancelled the Facebook login dialog — not an error.
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
-      await _routeAfterAuth();
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _friendlyError(e.code));
-    } catch (e) {
-      setState(() =>
-          _error = 'Facebook sign-in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   String _friendlyError(String code) {
     switch (code) {
       case 'user-not-found':
@@ -375,38 +351,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             BorderRadius.circular(12),
                       ),
                     ),
-                    icon: const Icon(Icons.g_mobiledata,
-                        size: 28,
-                        color: Color(0xFF2F5233)),
+                    icon: Image.asset(
+                      'assets/images/google_logo.png',
+                      height: 50,
+                      width: 50,
+                    ),
                     label: const Text(
                       'Continue with Google',
-                      style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.black87),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Facebook sign-in
-                  OutlinedButton.icon(
-                    onPressed:
-                        _loading ? null : _submitFacebook,
-                    style: OutlinedButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(
-                              vertical: 14),
-                      side: BorderSide(
-                          color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.facebook,
-                        size: 24,
-                        color: Color(0xFF1877F2)),
-                    label: const Text(
-                      'Continue with Facebook',
                       style: TextStyle(
                           fontSize: 15,
                           color: Colors.black87),
