@@ -165,9 +165,10 @@ class _ProfileTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => const SupplementProtocolScreen()),
+           context,
+          MaterialPageRoute(
+          builder: (_) => SupplementProtocolScreen(
+          horse: horse)),
           ),
         ),
         const SizedBox(height: 8),
@@ -331,35 +332,71 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
               return Card(
                 color: lowStock ? Colors.orange.shade50 : null,
                 child: ListTile(
-                  leading: Icon(
-                    e.isSupplement ? Icons.science : Icons.grass,
-                    color: lowStock ? Colors.orange : null,
-                  ),
-                  title: Text('${e.itemName} — ${e.dosage}'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        justMarked
-                            ? '${e.timeOfDay} · just given ✅'
-                            : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
-                      ),
-                      if (e.daysRemaining != null)
-                        Text(
-                          '${e.daysRemaining} days remaining'
-                          '${lowStock ? " · REORDER SOON" : ""}',
-                          style: TextStyle(
-                            color: lowStock
-                                ? Colors.orange.shade800
-                                : null,
-                            fontWeight: lowStock
-                                ? FontWeight.bold
-                                : null,
-                          ),
-                        ),
-                    ],
-                  ),
-                  isThreeLine: e.daysRemaining != null,
+  leading: Icon(
+    e.isSupplement ? Icons.science : Icons.grass,
+    color: lowStock ? Colors.orange : null,
+    size: 20,
+  ),
+  // Title — item name only
+  title: Text(
+    e.itemName,
+    style: const TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: 14,
+    ),
+  ),
+  // Subtitle — dosage, time, duration on separate lines
+  subtitle: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SizedBox(height: 2),
+      // Dosage on its own line
+      Text(
+        e.dosage,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 2),
+      // Time of day + last given
+      Text(
+        justMarked
+            ? '${e.timeOfDay} · just given ✅'
+            : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
+        style: const TextStyle(fontSize: 12),
+      ),
+      // Days remaining / duration
+      if (e.daysRemaining != null) ...[
+        const SizedBox(height: 2),
+        Text(
+          '${e.daysRemaining} days remaining'
+          '${lowStock ? " · REORDER SOON" : ""}',
+          style: TextStyle(
+            fontSize: 12,
+            color: lowStock
+                ? Colors.orange.shade800
+                : Colors.grey,
+            fontWeight: lowStock
+                ? FontWeight.bold
+                : FontWeight.normal,
+          ),
+        ),
+      ],
+      // Duration from daysOfSupply
+      if (e.daysOfSupply != null) ...[
+        const SizedBox(height: 2),
+        Text(
+          'Supply: ${e.daysOfSupply} days total',
+          style: const TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    ],
+  ),
+  isThreeLine: true,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

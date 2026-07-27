@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
+import '../models/horse.dart';
+import '../services/firestore_service.dart';
+import '../models/care_models.dart';
+import 'package:uuid/uuid.dart';
+import 'package:provider/provider.dart';
 
 class SupplementProtocolScreen extends StatefulWidget {
-  const SupplementProtocolScreen({super.key});
+  final Horse? horse;
+  const SupplementProtocolScreen({super.key, this.horse});
   @override
   State<SupplementProtocolScreen> createState() =>
       _SupplementProtocolScreenState();
@@ -12,25 +18,10 @@ class SupplementProtocolScreen extends StatefulWidget {
 class _SupplementProtocolScreenState
     extends State<SupplementProtocolScreen> {
   int _step = 0;
-  String? _discipline;
-  int? _ageYears;
-  final Set<String> _goals = {};
-  _Protocol? _result;
-  final _ageCtrl = TextEditingController();
-
+final Set<String> _goals = {};
+_Protocol? _result;
   bool get _isLoggedIn =>
       FirebaseAuth.instance.currentUser != null;
-
-  static const _disciplines = [
-    'Pleasure / Trail',
-    'Dressage',
-    'Show Jumping',
-    'Eventing',
-    'Western / Reining',
-    'Racing',
-    'Breeding',
-    'Retired / Companion',
-  ];
 
   static const _goalOptions = [
     '🫁 Gut health & ulcer prevention',
@@ -90,8 +81,7 @@ class _SupplementProtocolScreenState
         monitor: 'Recovery time, muscle soreness, topline',
       ));
     }
-    if (_goals.any((g) => g.contains('Senior')) ||
-        (_ageYears != null && _ageYears! >= 18)) {
+    if (_goals.any((g) => g.contains('Senior'))){
       recs.add(_SupplementRec(
         name: 'NutriEquine SeniorVital',
         dosage: '2 scoops daily',
@@ -122,12 +112,69 @@ class _SupplementProtocolScreenState
       ));
     }
     setState(() => _result = _Protocol(
-          discipline: _discipline ?? 'General',
-          goals: _goals.toList(),
-          recommendations: recs,
-        ));
+    goals: _goals.toList(),
+      recommendations: recs,
+));
     _next();
   }
+
+Future<void> _addToFeedPlan(
+    BuildContext context) async {
+  if (widget.horse == null || _result == null) return;
+
+  final fs = context.read<FirestoreService>();
+  int added = 0;
+
+  for (final rec in _result!.recommendations) {
+    // Parse timing to AM/PM/Midday
+    String timeOfDay = 'AM';
+    if (rec.timing.toLowerCase().contains('pm')) {
+      timeOfDay = 'PM';
+    } else if (rec.timing.toLowerCase().contains('midday') ||
+        rec.timing.toLowerCase().contains('noon')) {
+      timeOfDay = 'Midday';
+    }
+
+    // Parse days from duration string
+// e.g. "90 days minimum" → 90
+// e.g. "60–90 days" → 60
+int? parsedDays;
+final durationText = rec.duration.toLowerCase();
+final match = RegExp(r'\d+').firstMatch(durationText);
+if (match != null) {
+  parsedDays = int.tryParse(match.group(0) ?? '');
+}
+
+final entry = FeedEntry(
+  id: const Uuid().v4(),
+  horseId: widget.horse!.id,
+  ownerId: fs.uid,
+  itemName: rec.name,
+  dosage: rec.dosage,
+  timeOfDay: timeOfDay,
+  isSupplement: true,
+  daysOfSupply: parsedDays,
+  daysRemaining: parsedDays,
+);
+
+    await fs.addFeedEntry(entry);
+    added++;
+  }
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$added supplements added to '
+          "${widget.horse!.name}'s feed plan!",
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+    // Pop back to horse profile
+    Navigator.pop(context);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -179,83 +226,19 @@ class _SupplementProtocolScreenState
   }
 
   Widget _buildStep() {
-    switch (_step) {
-      case 0: return _buildDisciplineStep();
-      case 1: return _buildAgeStep();
-      case 2: return _buildGoalsStep();
-      case 3: return _buildResultStep();
-      default: return const SizedBox();
-    }
+  switch (_step) {
+    case 0: return _buildGoalsStep();
+    case 1: return _buildResultStep();
+    default: return const SizedBox();
   }
-
-  Widget _buildDisciplineStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('Step 1 of 3',
-            style: TextStyle(color: Colors.grey, fontSize: 12)),
-        const SizedBox(height: 8),
-        Text("What is your horse's primary discipline?",
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
-        Expanded(
-          child: ListView(
-            children: _disciplines.map((d) {
-              return ListTile(
-                title: Text(d),
-                leading: Radio<String>(
-                    value: d,
-                    groupValue: _discipline,
-          onChanged: (v) => setState(() => _discipline = v),
-        ),
-        onTap: () => setState(() => _discipline = d),
-      );
-    }).toList(),
-  ),
-),
-        FilledButton(
-          onPressed: _discipline != null ? _next : null,
-          child: const Text('Next'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAgeStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('Step 2 of 3',
-            style: TextStyle(color: Colors.grey, fontSize: 12)),
-        const SizedBox(height: 8),
-        Text('How old is your horse?',
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _ageCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Age in years',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (v) =>
-              setState(() => _ageYears = int.tryParse(v)),
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-            onPressed: _next, child: const Text('Next')),
-        TextButton(
-            onPressed: _next, child: const Text('Skip')),
-      ],
-    );
-  }
+}
 
   Widget _buildGoalsStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Step 3 of 3',
-            style: TextStyle(color: Colors.grey, fontSize: 12)),
+        const Text('Step 1 of 1',
+    style: TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 8),
         Text('What are your primary health goals?',
             style: Theme.of(context).textTheme.titleLarge),
@@ -288,8 +271,6 @@ class _SupplementProtocolScreenState
       children: [
         Text('Your Personalized Protocol',
             style: Theme.of(context).textTheme.titleLarge),
-        Text('For a ${_result!.discipline} horse',
-            style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 12),
         Expanded(
           child: ListView(
@@ -334,10 +315,18 @@ class _SupplementProtocolScreenState
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Add these to my horse's feed plan"),
-        ),
+        if (widget.horse != null)
+  FilledButton.icon(
+    icon: const Icon(Icons.add),
+    label: Text(
+        "Add to ${widget.horse!.name}'s feed plan"),
+    onPressed: () => _addToFeedPlan(context),
+  )
+else
+  FilledButton(
+    onPressed: () => Navigator.pop(context),
+    child: const Text('Done'),
+  ),
       ],
     );
   }
@@ -370,11 +359,9 @@ class _ProtocolRow extends StatelessWidget {
 }
 
 class _Protocol {
-  final String discipline;
   final List<String> goals;
   final List<_SupplementRec> recommendations;
   _Protocol({
-    required this.discipline,
     required this.goals,
     required this.recommendations,
   });

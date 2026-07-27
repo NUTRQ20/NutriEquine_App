@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import '../models/horse.dart';
 import '../services/firestore_service.dart';
 import 'horse_detail_screen.dart';
-import 'supplement_protocol_screen.dart';
 
 class HorseListScreen extends StatefulWidget {
   const HorseListScreen({super.key});
@@ -462,53 +461,16 @@ class _HorseListScreenState extends State<HorseListScreen> {
                         .toList();
 
                 if (allHorses.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.pets,
-                              size: 80,
-                              color:
-                                  Color(0xFF2F5233)),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'No horses yet',
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight:
-                                    FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Tap the button below to add your first horse.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: Colors.grey),
-                          ),
-                          const SizedBox(height: 24),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons
-                                .science_outlined),
-                            label: const Text(
-                                'Find supplement protocol'),
-                            onPressed: () =>
-                                Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const SupplementProtocolScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                   return const Center(
+                    child: Text(
+                    'No horses yet',
+                     style: TextStyle(
+                     fontSize: 22,
+                    fontWeight: FontWeight.bold,
                     ),
-                  );
+                  ),
+               );
                 }
-
                 if (horses.isEmpty) {
                   return const Center(
                       child: Text(
