@@ -9,8 +9,7 @@ class HorseListScreen extends StatefulWidget {
   const HorseListScreen({super.key});
 
   @override
-  State<HorseListScreen> createState() =>
-      _HorseListScreenState();
+  State<HorseListScreen> createState() => _HorseListScreenState();
 }
 
 class _HorseListScreenState extends State<HorseListScreen> {
@@ -58,15 +57,12 @@ class _HorseListScreenState extends State<HorseListScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red),
-            onPressed: () =>
-                Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
         ],
@@ -75,9 +71,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
 
     if (confirmed == true && mounted) {
       try {
-        await context
-            .read<FirestoreService>()
-            .deleteHorse(horse.id);
+        await context.read<FirestoreService>().deleteHorse(horse.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -89,9 +83,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content:
-                    Text('Error removing horse: $e')),
+            SnackBar(content: Text('Error removing horse: $e')),
           );
         }
       }
@@ -105,8 +97,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetCtx) => StatefulBuilder(
         builder: (sheetCtx, setSheetState) => Padding(
@@ -114,16 +105,12 @@ class _HorseListScreenState extends State<HorseListScreen> {
             left: 20,
             right: 20,
             top: 20,
-            bottom: MediaQuery.of(sheetCtx)
-                    .viewInsets
-                    .bottom +
-                24,
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
           ),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Handle bar
                 Center(
@@ -132,8 +119,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey.shade300,
-                      borderRadius:
-                          BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
@@ -141,27 +127,22 @@ class _HorseListScreenState extends State<HorseListScreen> {
 
                 Row(
                   children: [
-                    const Icon(Icons.pets,
-                        color: Color(0xFF2F5233)),
+                    const Icon(Icons.pets, color: Color(0xFF2F5233)),
                     const SizedBox(width: 8),
                     Text('Add a horse',
-                        style: Theme.of(sheetCtx)
-                            .textTheme
-                            .titleLarge),
+                        style: Theme.of(sheetCtx).textTheme.titleLarge),
                   ],
                 ),
                 const SizedBox(height: 20),
 
                 // ── Basic Info section ──
-                const _SectionLabel(
-                    'Basic Information'),
+                const _SectionLabel('Basic Information'),
                 const SizedBox(height: 10),
 
                 TextField(
                   controller: _nameCtrl,
                   autofocus: true,
-                  textCapitalization:
-                      TextCapitalization.words,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Horse name *',
                     border: OutlineInputBorder(),
@@ -172,26 +153,22 @@ class _HorseListScreenState extends State<HorseListScreen> {
 
                 TextField(
                   controller: _breedCtrl,
-                  textCapitalization:
-                      TextCapitalization.words,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Breed',
                     border: OutlineInputBorder(),
-                    hintText:
-                        'e.g. Thoroughbred, Quarter Horse',
+                    hintText: 'e.g. Thoroughbred, Quarter Horse',
                   ),
                 ),
                 const SizedBox(height: 12),
 
                 TextField(
                   controller: _disciplineCtrl,
-                  textCapitalization:
-                      TextCapitalization.words,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Discipline / Goal',
                     border: OutlineInputBorder(),
-                    hintText:
-                        'e.g. Dressage, Trail, Show Jumping',
+                    hintText: 'e.g. Dressage, Trail, Show Jumping',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -201,10 +178,8 @@ class _HorseListScreenState extends State<HorseListScreen> {
                     Expanded(
                       child: TextField(
                         controller: _ageCtrl,
-                        keyboardType:
-                            TextInputType.number,
-                        decoration:
-                            const InputDecoration(
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
                           labelText: 'Age (years)',
                           border: OutlineInputBorder(),
                         ),
@@ -214,12 +189,9 @@ class _HorseListScreenState extends State<HorseListScreen> {
                     Expanded(
                       child: TextField(
                         controller: _weightCtrl,
-                        keyboardType:
-                            const TextInputType
-                                .numberWithOptions(
-                                decimal: true),
-                        decoration:
-                            const InputDecoration(
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
                           labelText: 'Weight (kg)',
                           border: OutlineInputBorder(),
                         ),
@@ -235,13 +207,11 @@ class _HorseListScreenState extends State<HorseListScreen> {
 
                 TextField(
                   controller: _vetCtrl,
-                  textCapitalization:
-                      TextCapitalization.words,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Veterinarian name',
                     border: OutlineInputBorder(),
-                    prefixIcon:
-                        Icon(Icons.local_hospital),
+                    prefixIcon: Icon(Icons.local_hospital),
                     hintText: 'e.g. Dr. Sarah Johnson',
                   ),
                 ),
@@ -249,8 +219,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
 
                 TextField(
                   controller: _farrierCtrl,
-                  textCapitalization:
-                      TextCapitalization.words,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
                     labelText: 'Farrier name',
                     border: OutlineInputBorder(),
@@ -265,62 +234,43 @@ class _HorseListScreenState extends State<HorseListScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child:
-                              CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Colors.white,
                           ),
                         )
                       : const Icon(Icons.save),
-                  label: Text(_saving
-                      ? 'Saving...'
-                      : 'Save horse'),
+                  label: Text(_saving ? 'Saving...' : 'Save horse'),
                   onPressed: _saving
                       ? null
                       : () async {
-                          final name =
-                              _nameCtrl.text.trim();
+                          final name = _nameCtrl.text.trim();
                           if (name.isEmpty) {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                    'Please enter a horse name.'),
+                                content: Text('Please enter a horse name.'),
                               ),
                             );
                             return;
                           }
-                          setSheetState(
-                              () => _saving = true);
-                          final fs = context
-                              .read<FirestoreService>();
+                          setSheetState(() => _saving = true);
+                          final fs = context.read<FirestoreService>();
                           try {
                             final horse = Horse(
                               id: const Uuid().v4(),
                               ownerId: fs.uid,
                               name: name,
-                              breed: _breedCtrl.text
-                                  .trim(),
-                              discipline:
-                                  _disciplineCtrl.text
-                                      .trim(),
-                              ageYears: int.tryParse(
-                                  _ageCtrl.text.trim()),
-                              weightKg: double.tryParse(
-                                  _weightCtrl.text
-                                      .trim()),
-                              vetName: _vetCtrl.text
-                                      .trim()
-                                      .isEmpty
+                              breed: _breedCtrl.text.trim(),
+                              discipline: _disciplineCtrl.text.trim(),
+                              ageYears: int.tryParse(_ageCtrl.text.trim()),
+                              weightKg:
+                                  double.tryParse(_weightCtrl.text.trim()),
+                              vetName: _vetCtrl.text.trim().isEmpty
                                   ? null
                                   : _vetCtrl.text.trim(),
-                              farrierName: _farrierCtrl
-                                      .text
-                                      .trim()
-                                      .isEmpty
+                              farrierName: _farrierCtrl.text.trim().isEmpty
                                   ? null
-                                  : _farrierCtrl.text
-                                      .trim(),
+                                  : _farrierCtrl.text.trim(),
                               createdAt: DateTime.now(),
                             );
                             await fs.addHorse(horse);
@@ -328,42 +278,32 @@ class _HorseListScreenState extends State<HorseListScreen> {
                               Navigator.pop(sheetCtx);
                             }
                             if (mounted) {
-                              ScaffoldMessenger.of(
-                                      context)
-                                  .showSnackBar(
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                      '$name added!'),
-                                  backgroundColor:
-                                      Colors.green,
+                                  content: Text('$name added!'),
+                                  backgroundColor: Colors.green,
                                 ),
                               );
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(
-                                      context)
-                                  .showSnackBar(
+                              ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content:
-                                      Text('Error: $e'),
-                                  backgroundColor:
-                                      Colors.red,
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
                                 ),
                               );
                             }
                           } finally {
                             if (mounted) {
-                              setState(
-                                  () => _saving = false);
+                              setState(() => _saving = false);
                             }
                           }
                         },
                 ),
                 const SizedBox(height: 8),
                 TextButton(
-                  onPressed: () =>
-                      Navigator.pop(sheetCtx),
+                  onPressed: () => Navigator.pop(sheetCtx),
                   child: const Text('Cancel'),
                 ),
               ],
@@ -381,54 +321,45 @@ class _HorseListScreenState extends State<HorseListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-                12, 12, 12, 4),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Search horses...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade200,
                 contentPadding: EdgeInsets.zero,
               ),
-              onChanged: (v) => setState(
-                  () => _search = v.toLowerCase()),
+              onChanged: (v) => setState(() => _search = v.toLowerCase()),
             ),
           ),
           Expanded(
             child: StreamBuilder<List<Horse>>(
-              stream: fs.streamHorses(),
+              stream: fs.streamHorsesWithOrphanCleanup(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
                     child: Padding(
-                      padding:
-                          const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                              Icons.error_outline,
-                              color: Colors.red,
-                              size: 48),
+                          const Icon(Icons.error_outline,
+                              color: Colors.red, size: 48),
                           const SizedBox(height: 12),
                           Text(
                             'Error: ${snapshot.error}',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                color: Colors.red),
+                            style: const TextStyle(color: Colors.red),
                           ),
                           const SizedBox(height: 12),
                           FilledButton(
-                            onPressed: () =>
-                                setState(() {}),
-                            child:
-                                const Text('Retry'),
+                            onPressed: () => setState(() {}),
+                            child: const Text('Retry'),
                           ),
                         ],
                       ),
@@ -436,89 +367,63 @@ class _HorseListScreenState extends State<HorseListScreen> {
                   );
                 }
 
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                      child:
-                          CircularProgressIndicator());
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 }
 
-                final allHorses =
-                    snapshot.data ?? [];
+                final allHorses = snapshot.data ?? [];
                 final horses = _search.isEmpty
                     ? allHorses
                     : allHorses
                         .where((h) =>
-                            h.name
-                                .toLowerCase()
-                                .contains(_search) ||
-                            h.breed
-                                .toLowerCase()
-                                .contains(_search) ||
-                            h.discipline
-                                .toLowerCase()
-                                .contains(_search))
+                            h.name.toLowerCase().contains(_search) ||
+                            h.breed.toLowerCase().contains(_search) ||
+                            h.discipline.toLowerCase().contains(_search))
                         .toList();
 
                 if (allHorses.isEmpty) {
-                   return const Center(
+                  return const Center(
                     child: Text(
-                    'No horses yet',
-                     style: TextStyle(
-                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                      'No horses yet',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-               );
+                  );
                 }
                 if (horses.isEmpty) {
                   return const Center(
-                      child: Text(
-                          'No horses match your search.'));
+                      child: Text('No horses match your search.'));
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.only(
-                      bottom: 100),
+                  padding: const EdgeInsets.only(bottom: 100),
                   itemCount: horses.length,
                   itemBuilder: (context, i) {
                     final h = horses[i];
                     return Dismissible(
                       key: Key(h.id),
-                      direction:
-                          DismissDirection.endToStart,
+                      direction: DismissDirection.endToStart,
                       confirmDismiss: (_) async {
-                        final confirmed =
-                            await showDialog<bool>(
+                        final confirmed = await showDialog<bool>(
                           context: context,
                           builder: (_) => AlertDialog(
-                            title: const Text(
-                                'Remove horse?'),
+                            title: const Text('Remove horse?'),
                             content: Text(
                               'Delete ${h.name} and all records? '
                               'Cannot be undone.',
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(
-                                        context,
-                                        false),
-                                child: const Text(
-                                    'Cancel'),
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
                               ),
                               FilledButton(
-                                style: FilledButton
-                                    .styleFrom(
-                                        backgroundColor:
-                                            Colors
-                                                .red),
-                                onPressed: () =>
-                                    Navigator.pop(
-                                        context,
-                                        true),
-                                child: const Text(
-                                    'Delete'),
+                                style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.red),
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Delete'),
                               ),
                             ],
                           ),
@@ -528,75 +433,53 @@ class _HorseListScreenState extends State<HorseListScreen> {
                       onDismissed: (_) async {
                         await fs.deleteHorse(h.id);
                         if (mounted) {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(
+                          ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                  '${h.name} removed.'),
-                              backgroundColor:
-                                  Colors.red.shade700,
+                              content: Text('${h.name} removed.'),
+                              backgroundColor: Colors.red.shade700,
                             ),
                           );
                         }
                       },
                       background: Container(
-                        alignment:
-                            Alignment.centerRight,
-                        padding: const EdgeInsets.only(
-                            right: 20),
-                        margin:
-                            const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.red,
-                          borderRadius:
-                              BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Column(
-                          mainAxisSize:
-                              MainAxisSize.min,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.delete,
-                                color: Colors.white,
-                                size: 28),
+                            Icon(Icons.delete, color: Colors.white, size: 28),
                             SizedBox(height: 4),
                             Text('Delete',
                                 style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12)),
+                                    color: Colors.white, fontSize: 12)),
                           ],
                         ),
                       ),
                       child: Card(
                         child: ListTile(
-                          contentPadding:
-                              const EdgeInsets.all(12),
+                          contentPadding: const EdgeInsets.all(12),
                           leading: CircleAvatar(
                             radius: 28,
                             backgroundColor:
-                                const Color(0xFF2F5233)
-                                    .withValues(
-                                        alpha: 0.15),
-                            backgroundImage:
-                                h.photoUrl != null
-                                    ? NetworkImage(
-                                        h.photoUrl!)
-                                    : null,
+                                const Color(0xFF2F5233).withValues(alpha: 0.15),
+                            backgroundImage: h.photoUrl != null
+                                ? NetworkImage(h.photoUrl!)
+                                : null,
                             child: h.photoUrl == null
                                 ? Text(
                                     h.name.isNotEmpty
-                                        ? h.name[0]
-                                            .toUpperCase()
+                                        ? h.name[0].toUpperCase()
                                         : '?',
-                                    style:
-                                        const TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 22,
-                                      fontWeight:
-                                          FontWeight
-                                              .bold,
-                                      color: Color(
-                                          0xFF2F5233),
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2F5233),
                                     ),
                                   )
                                 : null,
@@ -604,75 +487,51 @@ class _HorseListScreenState extends State<HorseListScreen> {
                           title: Text(
                             h.name,
                             style: const TextStyle(
-                              fontWeight:
-                                  FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
                           subtitle: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
                               if (h.breed.isNotEmpty)
                                 Text(h.breed,
-                                    style:
-                                        const TextStyle(
-                                            color: Colors
-                                                .grey)),
-                              if (h.discipline
-                                  .isNotEmpty)
+                                    style: const TextStyle(color: Colors.grey)),
+                              if (h.discipline.isNotEmpty)
                                 Text(
                                   h.discipline,
-                                  style:
-                                      const TextStyle(
-                                    color: Color(
-                                        0xFF2F5233),
+                                  style: const TextStyle(
+                                    color: Color(0xFF2F5233),
                                     fontSize: 12,
                                   ),
                                 ),
-                              if (h.vetName != null ||
-                                  h.farrierName !=
-                                      null)
+                              if (h.vetName != null || h.farrierName != null)
                                 Text(
                                   [
-                                    if (h.vetName !=
-                                        null)
-                                      'Vet: ${h.vetName}',
-                                    if (h.farrierName !=
-                                        null)
+                                    if (h.vetName != null) 'Vet: ${h.vetName}',
+                                    if (h.farrierName != null)
                                       'Farrier: ${h.farrierName}',
                                   ].join(' · '),
-                                  style:
-                                      const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors
-                                              .grey),
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey),
                                 ),
                             ],
                           ),
                           trailing: Row(
-                            mainAxisSize:
-                                MainAxisSize.min,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               if (h.ageYears != null)
                                 Chip(
-                                  label: Text(
-                                      '${h.ageYears}y'),
-                                  padding:
-                                      EdgeInsets.zero,
-                                  labelStyle:
-                                      const TextStyle(
-                                          fontSize: 11),
+                                  label: Text('${h.ageYears}y'),
+                                  padding: EdgeInsets.zero,
+                                  labelStyle: const TextStyle(fontSize: 11),
                                 ),
                               PopupMenuButton<String>(
-                                icon: const Icon(
-                                    Icons.more_vert),
+                                icon: const Icon(Icons.more_vert),
                                 onSelected: (val) {
                                   if (val == 'delete') {
-                                    _confirmDeleteHorse(
-                                        h);
+                                    _confirmDeleteHorse(h);
                                   }
                                 },
                                 itemBuilder: (_) => [
@@ -681,18 +540,13 @@ class _HorseListScreenState extends State<HorseListScreen> {
                                     child: Row(
                                       children: [
                                         Icon(
-                                          Icons
-                                              .delete_outline,
-                                          color:
-                                              Colors.red,
+                                          Icons.delete_outline,
+                                          color: Colors.red,
                                         ),
-                                        SizedBox(
-                                            width: 8),
+                                        SizedBox(width: 8),
                                         Text(
                                           'Remove horse',
-                                          style: TextStyle(
-                                              color: Colors
-                                                  .red),
+                                          style: TextStyle(color: Colors.red),
                                         ),
                                       ],
                                     ),
@@ -704,9 +558,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  HorseDetailScreen(
-                                      horse: h),
+                              builder: (_) => HorseDetailScreen(horse: h),
                             ),
                           ),
                         ),
@@ -719,8 +571,7 @@ class _HorseListScreenState extends State<HorseListScreen> {
           ),
         ],
       ),
-      floatingActionButton:
-          FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddHorseSheet,
         icon: const Icon(Icons.add),
         label: const Text('Add Horse'),

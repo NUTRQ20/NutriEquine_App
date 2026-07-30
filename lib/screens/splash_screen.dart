@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'onboarding_screen.dart';
@@ -45,6 +47,20 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
       if (user != null) {
+        // Don't just trust the locally cached session — confirm with
+        // Firebase that this account still actually exists. If it was
+        // deleted or disabled from the Firebase Console, this signs the
+        // device out and we fall through to the login screen instead.
+        final wasSignedOut =
+            await context.read<AuthService>().validateSession();
+        if (!mounted) return;
+        if (wasSignedOut) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (_) => false,
+          );
+          return;
+        }
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (_) => false,
@@ -89,14 +105,14 @@ class _SplashScreenState extends State<SplashScreen>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),                      
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
                   ],
                 ),
-                child: const Icon(Icons.pets, size: 56,
-                    color: Color(0xFF2F5233)),
+                child:
+                    const Icon(Icons.pets, size: 56, color: Color(0xFF2F5233)),
               ),
               const SizedBox(height: 24),
               const Text('NutriEquine',
@@ -108,9 +124,7 @@ class _SplashScreenState extends State<SplashScreen>
               const SizedBox(height: 8),
               const Text('Horse Care Operating System',
                   style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      letterSpacing: 0.5)),
+                      color: Colors.white70, fontSize: 14, letterSpacing: 0.5)),
               const SizedBox(height: 48),
               const SizedBox(
                 width: 32,
