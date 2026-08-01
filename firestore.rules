@@ -2,23 +2,97 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Helper: user has active profile document ─────────────────────────
+    // Used to block writes from users whose accounts have been deleted.
+    // Only blocks CREATE and UPDATE — not DELETE.
+    // This allows cleanup operations to proceed even after
+    // the users document has been removed.
+    function userIsActive() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // ── Users ────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if userIsActive() && request.auth.uid == userId;
+      // Allow delete by the authenticated owner at any time —
+      // needed for both self-deletion and cleanup flows.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Horses ───────────────────────────────────────────────────────────
     match /horses/{horseId} {
-      allow read, update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      // Read: owner or shared user.
+      allow read: if request.auth != null
+        && (resource.data.ownerId == request.auth.uid
+            || request.auth.uid in resource.data.sharedWith);
+
+      // Create: only active users for themselves.
+      allow create: if userIsActive()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      // Update: only active owner.
+      allow update: if userIsActive()
+        && resource.data.ownerId == request.auth.uid;
+
+      // Delete: owner can delete even after their users document is gone.
+      // This is essential for the cleanup flow — the app deletes
+      // horses BEFORE deleting the users document, and also needs
+      // to clean up after account deletion is detected.
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
     }
 
+    // ── Feed Entries ─────────────────────────────────────────────────────
     match /feed_entries/{entryId} {
-      allow read, write: if request.auth != null;
-      // For production, tighten this by checking the parent horse's ownerId
-      // via a get() call, or denormalize ownerId onto each subcollection doc.
+      allow read:   if request.auth != null;
+      // Block new writes from inactive users.
+      allow create, update: if userIsActive();
+      // Allow delete by authenticated owner for cleanup.
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
     }
 
+    // ── Wellness Logs ────────────────────────────────────────────────────
     match /wellness_logs/{logId} {
-      allow read, write: if request.auth != null;
+      allow read:   if request.auth != null;
+      allow create, update: if userIsActive();
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
     }
 
+    // ── Care Reminders ───────────────────────────────────────────────────
     match /care_reminders/{reminderId} {
-      allow read, write: if request.auth != null;
+      allow read:   if request.auth != null;
+      allow create, update: if userIsActive();
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
     }
+
+    // ── Training Logs ────────────────────────────────────────────────────
+    match /training_logs/{logId} {
+      allow read:   if request.auth != null;
+      allow create, update: if userIsActive();
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ── Barn Tasks ───────────────────────────────────────────────────────
+    match /barn_tasks/{taskId} {
+      allow read:   if request.auth != null;
+      allow create, update: if userIsActive();
+      allow delete: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ── User Profiles ────────────────────────────────────────────────────
+    match /user_profiles/{userId} {
+      allow read:   if request.auth != null && request.auth.uid == userId;
+      allow create, update: if userIsActive() && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
   }
 }

@@ -230,10 +230,11 @@ class FirestoreService {
   }
 
   /// Deletes the user profile document from the users collection.
+  /// This is a critical security step — once this document is deleted,
+  /// the Firestore rules block all CREATE and UPDATE operations for this user.
+  /// Throws on error so callers can handle and log failures.
   Future<void> deleteUserProfile(String userUid) async {
-    try {
-      await _users.doc(userUid).delete();
-    } catch (_) {}
+    await _users.doc(userUid).delete();
   }
 
   Future<void> updateHorsePhoto(String horseId, String photoUrl) =>
