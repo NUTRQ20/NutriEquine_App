@@ -417,18 +417,25 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           await fs.markFeedGiven(e.id);
                           if (e.daysRemaining != null &&
                               e.daysRemaining! > 0) {
+                            // Calculate NEW value after decrement
+                            final newDays =
+                                e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
                                 e.id, e.daysRemaining!);
-                          }
-                          if (e.isLowStock) {
-                            await NotificationService()
-                                .showInstantNotification(
-                              id: e.id.hashCode,
-                              title:
-                                  'Low Stock: ${e.itemName}',
-                              body:
-                                  'Only ${e.daysRemaining} days remaining — time to reorder.',
-                            );
+                            // Fire notification using newDays
+                            // so the message shows correct value
+                            if (newDays <= 7) {
+                              await NotificationService()
+                                  .showInstantNotification(
+                                id: e.id.hashCode,
+                                title: newDays == 0
+                                    ? '🚨 Out of Stock: ${e.itemName}'
+                                    : '⚠️ Low Stock: ${e.itemName}',
+                                body: newDays == 0
+                                    ? '${e.itemName} has run out — reorder now!'
+                                    : 'Only $newDays days remaining — time to reorder.',
+                              );
+                            }
                           }
                         },
                       ),
@@ -969,12 +976,17 @@ class _RemindersTab extends StatelessWidget {
                         : notesCtrl.text.trim(),
                   );
                   final docId = await fs.addReminder(reminder);
-                  await notifs.scheduleReminderNotification(
-                    id: docId.hashCode,
+                  // Schedule TWO notifications:
+                  // 1. 24 hours before due date
+                  // 2. At 9:00 AM on the due date
+                  await notifs.scheduleBothNotifications(
+                    baseId: docId.hashCode,
                     title: '${horse.name}: ${reminder.title}',
-                    body:
+                    beforeBody:
                         '${reminder.category} reminder due tomorrow.',
-                    scheduledDate: dueDate,
+                    onDayBody:
+                        '${reminder.category} reminder is due today!',
+                    dueDate: dueDate,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
@@ -1140,6 +1152,22 @@ class _BarnTasksTab extends StatelessWidget {
                         ? null
                         : notesCtrl.text.trim(),
                   ));
+                  // Schedule TWO notifications:
+                  // 1. 24 hours before due date
+                  // 2. At 9:00 AM on the due date
+                  final notifs =
+                      context.read<NotificationService>();
+                  await notifs.scheduleBothNotifications(
+                    baseId:
+                        '${horse.id}_${titleCtrl.text}'.hashCode,
+                    title:
+                        'Barn Task: ${titleCtrl.text.trim()}',
+                    beforeBody:
+                        '$category task for ${horse.name} is due tomorrow.',
+                    onDayBody:
+                        '$category task for ${horse.name} is due today!',
+                    dueDate: dueDate,
+                  );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
                 child: const Text('Save task'),

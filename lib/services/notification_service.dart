@@ -150,6 +150,102 @@ class NotificationService {
     );
   }
 
+  /// Schedules a notification at 9:00 AM on the exact due date.
+  Future<void> scheduleOnDayNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime dueDate,
+  }) async {
+    if (!_initialized) await init();
+
+    // Fire at 9:00 AM on the due date
+    final notifyAt = DateTime(
+      dueDate.year,
+      dueDate.month,
+      dueDate.day,
+      9,
+      0,
+    );
+    if (notifyAt.isBefore(DateTime.now())) return;
+
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(notifyAt, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'nutriequine_channel',
+            'NutriEquine Reminders',
+            channelDescription:
+                'Horse care and supplement reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode:
+            AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      try {
+        await _plugin.zonedSchedule(
+          id,
+          title,
+          body,
+          tz.TZDateTime.from(notifyAt, tz.local),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'nutriequine_channel',
+              'NutriEquine Reminders',
+              channelDescription:
+                  'Horse care and supplement reminders',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+          androidScheduleMode:
+              AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Schedules TWO notifications for a due date:
+  ///   1. 24 hours before the due date
+  ///   2. At 9:00 AM on the due date
+  /// Uses baseId for the first and baseId+1 for the second.
+  Future<void> scheduleBothNotifications({
+    required int baseId,
+    required String title,
+    required String beforeBody,
+    required String onDayBody,
+    required DateTime dueDate,
+  }) async {
+    // 24 hours before
+    await scheduleReminderNotification(
+      id: baseId,
+      title: title,
+      body: beforeBody,
+      scheduledDate: dueDate,
+    );
+    // On the day at 9 AM
+    await scheduleOnDayNotification(
+      id: baseId + 1,
+      title: title,
+      body: onDayBody,
+      dueDate: dueDate,
+    );
+  }
+
   Future<void> cancelNotification(int id) =>
       _plugin.cancel(id);
 
