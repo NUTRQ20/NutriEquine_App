@@ -13,7 +13,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentPage = 0;
 
   final List<_OnboardingPage> _pages = [
-    _OnboardingPage(emoji: '🐴', title: 'Welcome to NutriEquine',
+    _OnboardingPage(emoji: '🐴', title: 'Welcome to EquineEdge',
       subtitle: 'The all-in-one horse care app for owners, trainers, and barn staff.',
       color: const Color(0xFF2F5233)),
     _OnboardingPage(emoji: '🌿', title: 'Track Feeding & Supplements',
