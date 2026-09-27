@@ -34,9 +34,9 @@ class NotificationService {
 
   Future<void> _createAndroidChannel() async {
     const channel = AndroidNotificationChannel(
-      'nutriequine_channel',
-      'NutriEquine Reminders',
-      description: 'Horse care and supplement reminders',
+      'equineedge_channel',
+      'EquineEdge Reminders',
+      description: 'EquineEdge horse care and supplement reminders',
       importance: Importance.high,
     );
     try {
@@ -69,9 +69,9 @@ class NotificationService {
 
   static const _notifDetails = NotificationDetails(
     android: AndroidNotificationDetails(
-      'nutriequine_channel',
-      'NutriEquine Reminders',
-      channelDescription: 'Horse care and supplement reminders',
+      'equineedge_channel',
+      'EquineEdge Reminders',
+      channelDescription: 'EquineEdge horse care and supplement reminders',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',

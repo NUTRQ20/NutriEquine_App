@@ -35,7 +35,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.nutriequine_app"
-        minSdk = 26  // Raised from flutter.minSdkVersion (was 21/24) — MobSF fix: drop vulnerable Android 7.x
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -44,16 +44,6 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = true        // Obfuscate and shrink code
-            isShrinkResources = true      // Remove unused resources
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-            isShrinkResources = false
         }
     }
 }

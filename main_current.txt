@@ -28,14 +28,14 @@ Future<void> main() async {
       );
     } catch (_) {}
   } catch (e) {
-    // debugPrint('Firebase init error: $e');
+    debugPrint('Firebase init error: $e');
   }
 
   try {
     await NotificationService().init();
     await NotificationService().requestPermissions();
   } catch (e) {
-    // debugPrint('Notification init error: $e');
+    debugPrint('Notification init error: $e');
   }
 
   try {
@@ -44,7 +44,7 @@ Future<void> main() async {
       await FeedAutoUpdateService().runDailyCheck();
     }
   } catch (e) {
-    // debugPrint('Feed auto update error: $e');
+    debugPrint('Feed auto update error: $e');
   }
 
   runApp(const EquineEdgeApp());
@@ -73,14 +73,16 @@ class _EquineEdgeAppState extends State<EquineEdgeApp>
 
     _tokenSubscription =
         FirebaseAuth.instance.idTokenChanges().listen((user) async {
-      // debugPrint( '[SessionCheck] idTokenChanges fired, user=${user?.uid ?? "null"}');
+      debugPrint(
+          '[SessionCheck] idTokenChanges fired, user=${user?.uid ?? "null"}');
       if (user == null) return;
       await _verifyUserStillExists(user);
     });
 
     _authStateSubscription =
         FirebaseAuth.instance.authStateChanges().listen((user) async {
-      // debugPrint( '[SessionCheck] authStateChanges fired, user=${user?.uid ?? "null"}');
+      debugPrint(
+          '[SessionCheck] authStateChanges fired, user=${user?.uid ?? "null"}');
       if (user == null) return;
       await _verifyUserStillExists(user);
     });
@@ -96,11 +98,11 @@ class _EquineEdgeAppState extends State<EquineEdgeApp>
         if (_handlingDeletion) return;
         final user = FirebaseAuth.instance.currentUser;
         if (user == null) return;
-        // debugPrint('[SessionCheck] Running periodic account check...');
+        debugPrint('[SessionCheck] Running periodic account check...');
         await _verifyUserStillExists(user);
       },
     );
-    // debugPrint('[SessionCheck] Periodic session check started (every 30s)');
+    debugPrint('[SessionCheck] Periodic session check started (every 30s)');
   }
 
   @override
@@ -126,7 +128,7 @@ class _EquineEdgeAppState extends State<EquineEdgeApp>
     if (_handlingDeletion) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    // debugPrint('[SessionCheck] Checking session on resume...');
+    debugPrint('[SessionCheck] Checking session on resume...');
     await _verifyUserStillExists(user);
   }
 
@@ -140,19 +142,19 @@ class _EquineEdgeAppState extends State<EquineEdgeApp>
         await _handleDeletedAccount();
       }
     } on FirebaseAuthException catch (e) {
-      // debugPrint('Session check error code: ${e.code}');
+      debugPrint('Session check error code: ${e.code}');
       if (e.code != 'network-request-failed') {
         await _handleDeletedAccount();
       }
     } catch (e) {
-      // debugPrint('Session check unknown error: $e');
+      debugPrint('Session check unknown error: $e');
     }
   }
 
   Future<void> _handleDeletedAccount() async {
     if (_handlingDeletion) return;
     _handlingDeletion = true;
-    // debugPrint('[SessionCheck] Account deleted — starting cleanup');
+    debugPrint('[SessionCheck] Account deleted — starting cleanup');
 
     _sessionCheckTimer?.cancel();
     _tokenSubscription?.cancel();
@@ -164,25 +166,25 @@ class _EquineEdgeAppState extends State<EquineEdgeApp>
       final fs = FirestoreService();
 
       try {
-        // debugPrint('[SessionCheck] Step 1: revoking write access');
+        debugPrint('[SessionCheck] Step 1: revoking write access');
         await fs.deleteUserProfile(uid);
-        // debugPrint('[SessionCheck] Step 1 complete — writes now blocked');
+        debugPrint('[SessionCheck] Step 1 complete — writes now blocked');
       } catch (e) {
-        // debugPrint('[SessionCheck] Step 1 error: $e');
+        debugPrint('[SessionCheck] Step 1 error: $e');
       }
 
       try {
-        // debugPrint('[SessionCheck] Step 2: deleting all horse data');
+        debugPrint('[SessionCheck] Step 2: deleting all horse data');
         await fs.deleteAllHorsesForUser(uid);
-        // debugPrint('[SessionCheck] Step 2 complete — all data deleted');
+        debugPrint('[SessionCheck] Step 2 complete — all data deleted');
       } catch (e) {
-        // debugPrint('[SessionCheck] Step 2 error: $e');
+        debugPrint('[SessionCheck] Step 2 error: $e');
       }
     }
 
     try {
       await FirebaseAuth.instance.signOut();
-      // debugPrint('[SessionCheck] Step 3 complete — signed out');
+      debugPrint('[SessionCheck] Step 3 complete — signed out');
     } catch (_) {}
 
     final ctx = _navigatorKey.currentContext;
