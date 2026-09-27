@@ -46,9 +46,6 @@ dependencies:
   # Connectivity
   connectivity_plus: ^6.0.5
 
-  # URL launcher — opens nutriequine.com in browser
-  url_launcher: ^6.3.0
-
   cupertino_icons: ^1.0.6
 
 dev_dependencies:

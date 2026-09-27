@@ -47,7 +47,10 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
       if (user != null) {
-        // Verify account still exists in Firebase
+        // Don't just trust the locally cached session — confirm with
+        // Firebase that this account still actually exists. If it was
+        // deleted or disabled from the Firebase Console, this signs the
+        // device out and we fall through to the login screen instead.
         final wasSignedOut =
             await context.read<AuthService>().validateSession();
         if (!mounted) return;
@@ -108,26 +111,20 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ],
                 ),
-                child: const Icon(Icons.pets,
-                    size: 56, color: Color(0xFF2F5233)),
+                child:
+                    const Icon(Icons.pets, size: 56, color: Color(0xFF2F5233)),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'EquineEdge',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2),
-              ),
+              const Text('NutriEquine',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2)),
               const SizedBox(height: 8),
-              const Text(
-                'Horse Care Operating System',
-                style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    letterSpacing: 0.5),
-              ),
+              const Text('Horse Care Operating System',
+                  style: TextStyle(
+                      color: Colors.white70, fontSize: 14, letterSpacing: 0.5)),
               const SizedBox(height: 48),
               const SizedBox(
                 width: 32,
