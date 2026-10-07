@@ -88,7 +88,7 @@ class _ProfileTab extends StatelessWidget {
               CircleAvatar(
                 radius: 56,
                 backgroundColor:
-                    const Color(0xFF2F5233).withOpacity(0.15),
+                    const Color(0xFF2F5233).withValues(alpha: 0.15),
                 backgroundImage: horse.photoUrl != null
                     ? NetworkImage(horse.photoUrl!)
                     : null,
@@ -263,7 +263,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                     labelText: 'Days of supply (for inventory tracking)'),
               ),
               DropdownButtonFormField<String>(
-                value: timeOfDay,
+                initialValue: timeOfDay,
                 items: ['AM', 'Midday', 'PM']
                     .map((t) =>
                         DropdownMenuItem(value: t, child: Text(t)))
@@ -515,7 +515,7 @@ class _WellnessTab extends StatelessWidget {
                     style: Theme.of(ctx).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: appetite,
+                  initialValue: appetite,
                   items: ['Good', 'Reduced', 'None']
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -526,7 +526,7 @@ class _WellnessTab extends StatelessWidget {
                       const InputDecoration(labelText: 'Appetite'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: manure,
+                  initialValue: manure,
                   items: ['Normal', 'Loose', 'Hard', 'Mucus', 'Other']
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -759,7 +759,7 @@ class _TrainingTab extends StatelessWidget {
                     style: Theme.of(ctx).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: type,
+                  initialValue: type,
                   items: TrainingLog.types
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -770,7 +770,7 @@ class _TrainingTab extends StatelessWidget {
                       labelText: 'Session type'),
                 ),
                 DropdownButtonFormField<String>(
-                  value: intensity,
+                  initialValue: intensity,
                   items: TrainingLog.intensityLevels
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -926,7 +926,7 @@ class _RemindersTab extends StatelessWidget {
                   decoration:
                       const InputDecoration(labelText: 'Title')),
               DropdownButtonFormField<String>(
-                value: category,
+                initialValue: category,
                 items: [
                   'Vet', 'Farrier', 'Dental', 'Deworm',
                   'Vaccine', 'Supplement Refill', 'General'
@@ -956,8 +956,9 @@ class _RemindersTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 730)),
                   );
-                  if (picked != null)
+                  if (picked != null) {
                     setState(() => dueDate = picked);
+                  }
                 },
               ),
               const SizedBox(height: 16),
@@ -1015,8 +1016,9 @@ class _RemindersTab extends StatelessWidget {
             children: reminders.map((r) {
               Color? cardColor;
               if (r.isOverdue) cardColor = Colors.red.shade50;
-              if (r.isDueSoon)
+              if (r.isDueSoon) {
                 cardColor = Colors.yellow.shade50;
+              }
               return Card(
                 color: cardColor,
                 child: CheckboxListTile(
@@ -1104,7 +1106,7 @@ class _BarnTasksTab extends StatelessWidget {
                   decoration: const InputDecoration(
                       labelText: 'Assigned to (name)')),
               DropdownButtonFormField<String>(
-                value: category,
+                initialValue: category,
                 items: BarnTask.categories
                     .map((c) => DropdownMenuItem(
                         value: c, child: Text(c)))
@@ -1132,8 +1134,9 @@ class _BarnTasksTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 365)),
                   );
-                  if (picked != null)
+                  if (picked != null) {
                     setState(() => dueDate = picked);
+                  }
                 },
               ),
               const SizedBox(height: 16),

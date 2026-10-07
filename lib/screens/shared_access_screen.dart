@@ -165,11 +165,11 @@ class _SharedAccessScreenState extends State<SharedAccessScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2F5233).withOpacity(0.08),
+                color: const Color(0xFF2F5233).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                     color:
-                        const Color(0xFF2F5233).withOpacity(0.3)),
+                        const Color(0xFF2F5233).withValues(alpha: 0.3)),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +294,7 @@ class _SharedAccessScreenState extends State<SharedAccessScreen> {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: const Color(0xFF2F5233)
-                            .withOpacity(0.15),
+                            .withValues(alpha: 0.15),
                         child: Text(
                           entry.value.isNotEmpty
                               ? entry.value[0].toUpperCase()

@@ -94,7 +94,7 @@ class _BcsChart extends StatelessWidget {
             LineChartData(
               minY: 1,
               maxY: 9,
-              gridData: FlGridData(show: true),
+              gridData: const FlGridData(show: true),
               titlesData: FlTitlesData(
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -124,10 +124,10 @@ class _BcsChart extends StatelessWidget {
                     },
                   ),
                 ),
-                rightTitles: AxisTitles(
+                rightTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
-                topTitles: AxisTitles(
+                topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
               ),
@@ -138,7 +138,7 @@ class _BcsChart extends StatelessWidget {
                   isCurved: true,
                   color: const Color(0xFF2F5233),
                   barWidth: 3,
-                  dotData: FlDotData(show: false),
+                  dotData: const FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show: true,
                     color: const Color(0xFF2F5233)
@@ -249,10 +249,10 @@ class _TrainingChart extends StatelessWidget {
                     ),
                   ),
                 ),
-                rightTitles: AxisTitles(
+                rightTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
-                topTitles: AxisTitles(
+                topTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
               ),

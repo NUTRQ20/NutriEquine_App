@@ -100,7 +100,7 @@ class _ArticleDetailScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2F5233).withOpacity(0.08),
+                color: const Color(0xFF2F5233).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(

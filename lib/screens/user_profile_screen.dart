@@ -469,7 +469,7 @@ class _UserProfileScreenState
                           ),
                         ] else ...[
                           DropdownButtonFormField<String>(
-                            value: _role,
+                            initialValue: _role,
                             decoration: const InputDecoration(
                               labelText: 'Role',
                               border: OutlineInputBorder(),
@@ -495,7 +495,7 @@ class _UserProfileScreenState
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
-                            value: _gender,
+                            initialValue: _gender,
                             decoration: const InputDecoration(
                               labelText: 'Gender',
                               border: OutlineInputBorder(),

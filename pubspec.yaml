@@ -55,6 +55,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/equineedgelogo.png"
+  min_sdk_android: 26
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/products/
+    - assets/images/
+    - assets/icons/

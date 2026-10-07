@@ -164,7 +164,7 @@ class _UserDetailsScreenState
 
                 // Role dropdown
                 DropdownButtonFormField<String>(
-                  value: _role,
+                  initialValue: _role,
                   decoration: const InputDecoration(
                     labelText: 'Your role *',
                     border: OutlineInputBorder(),
@@ -197,7 +197,7 @@ class _UserDetailsScreenState
 
                 // Gender dropdown
                 DropdownButtonFormField<String>(
-                  value: _gender,
+                  initialValue: _gender,
                   decoration: const InputDecoration(
                     labelText: 'Gender',
                     border: OutlineInputBorder(),

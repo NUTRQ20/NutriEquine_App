@@ -13,21 +13,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentPage = 0;
 
   final List<_OnboardingPage> _pages = [
-    _OnboardingPage(emoji: '🐴', title: 'Welcome to EquineEdge',
+    const _OnboardingPage(emoji: '🐴', title: 'Welcome to EquineEdge',
       subtitle: 'The all-in-one horse care app for owners, trainers, and barn staff.',
-      color: const Color(0xFF2F5233)),
-    _OnboardingPage(emoji: '🌿', title: 'Track Feeding & Supplements',
+      color: Color(0xFF2F5233)),
+    const _OnboardingPage(emoji: '🌿', title: 'Track Feeding & Supplements',
       subtitle: 'Build AM/PM feed plans, track supplement dosages, and get low-stock alerts before you run out.',
-      color: const Color(0xFF3D6B42)),
-    _OnboardingPage(emoji: '❤️', title: 'Monitor Daily Wellness',
+      color: Color(0xFF3D6B42)),
+    const _OnboardingPage(emoji: '❤️', title: 'Monitor Daily Wellness',
       subtitle: 'Log appetite, manure, body condition, and behavior. Get guidance when something looks off.',
-      color: const Color(0xFF4A7C59)),
-    _OnboardingPage(emoji: '📅', title: 'Never Miss a Care Event',
+      color: Color(0xFF4A7C59)),
+    const _OnboardingPage(emoji: '📅', title: 'Never Miss a Care Event',
       subtitle: 'Schedule vet, farrier, dental, vaccines, and deworming with reminders sent straight to your phone.',
-      color: const Color(0xFF558B6E)),
-    _OnboardingPage(emoji: '👥', title: 'Coordinate Your Care Team',
+      color: Color(0xFF558B6E)),
+    const _OnboardingPage(emoji: '👥', title: 'Coordinate Your Care Team',
       subtitle: 'Share horse profiles with your vet, trainer, or barn staff. Assign tasks and track completion.',
-      color: const Color(0xFF2F5233)),
+      color: Color(0xFF2F5233)),
   ];
 
   Future<void> _finish() async {
@@ -124,7 +124,7 @@ class _OnboardingPage extends StatelessWidget {
               style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Text(subtitle, textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 16, height: 1.5)),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 16, height: 1.5)),
         ],
       ),
     );

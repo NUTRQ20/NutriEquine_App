@@ -337,9 +337,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 return Column(
                   children: [
                     // Legend
-                    SingleChildScrollView(
+                    const SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
+                      padding: EdgeInsets.symmetric(
                           horizontal: 12, vertical: 6),
                       child: Row(
                         children: [
