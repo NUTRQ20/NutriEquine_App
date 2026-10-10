@@ -9,6 +9,7 @@ import '../models/barn_task.dart';
 import '../services/firestore_service.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
+import '../services/feed_auto_update_service.dart';
 import 'analytics_screen.dart';
 import 'shared_access_screen.dart';
 import 'supplement_protocol_screen.dart';
@@ -88,7 +89,7 @@ class _ProfileTab extends StatelessWidget {
               CircleAvatar(
                 radius: 56,
                 backgroundColor:
-                    const Color(0xFF2F5233).withValues(alpha: 0.15),
+                    const Color(0xFF2F5233).withOpacity(0.15),
                 backgroundImage: horse.photoUrl != null
                     ? NetworkImage(horse.photoUrl!)
                     : null,
@@ -263,7 +264,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                     labelText: 'Days of supply (for inventory tracking)'),
               ),
               DropdownButtonFormField<String>(
-                initialValue: timeOfDay,
+                value: timeOfDay,
                 items: ['AM', 'Midday', 'PM']
                     .map((t) =>
                         DropdownMenuItem(value: t, child: Text(t)))
@@ -422,20 +423,15 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                                 e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
                                 e.id, e.daysRemaining!);
-                            // Fire notification using newDays
-                            // so the message shows correct value
-                            if (newDays <= 7) {
-                              await NotificationService()
-                                  .showInstantNotification(
-                                id: e.id.hashCode,
-                                title: newDays == 0
-                                    ? '🚨 Out of Stock: ${e.itemName}'
-                                    : '⚠️ Low Stock: ${e.itemName}',
-                                body: newDays == 0
-                                    ? '${e.itemName} has run out — reorder now!'
-                                    : 'Only $newDays days remaining — time to reorder.',
-                              );
-                            }
+                            // Schedule restock alert for TOMORROW 8 AM.
+                            // This fires even when the app is completely closed
+                            // because it uses Android AlarmManager via zonedSchedule().
+                            // Old showInstantNotification() only worked in foreground.
+                            await FeedAutoUpdateService().onFeedItemTicked(
+                              docId: e.id,
+                              itemName: e.itemName,
+                              newDaysRemaining: newDays,
+                            );
                           }
                         },
                       ),
@@ -515,7 +511,7 @@ class _WellnessTab extends StatelessWidget {
                     style: Theme.of(ctx).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: appetite,
+                  value: appetite,
                   items: ['Good', 'Reduced', 'None']
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -526,7 +522,7 @@ class _WellnessTab extends StatelessWidget {
                       const InputDecoration(labelText: 'Appetite'),
                 ),
                 DropdownButtonFormField<String>(
-                  initialValue: manure,
+                  value: manure,
                   items: ['Normal', 'Loose', 'Hard', 'Mucus', 'Other']
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -759,7 +755,7 @@ class _TrainingTab extends StatelessWidget {
                     style: Theme.of(ctx).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: type,
+                  value: type,
                   items: TrainingLog.types
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -770,7 +766,7 @@ class _TrainingTab extends StatelessWidget {
                       labelText: 'Session type'),
                 ),
                 DropdownButtonFormField<String>(
-                  initialValue: intensity,
+                  value: intensity,
                   items: TrainingLog.intensityLevels
                       .map((t) => DropdownMenuItem(
                           value: t, child: Text(t)))
@@ -926,7 +922,7 @@ class _RemindersTab extends StatelessWidget {
                   decoration:
                       const InputDecoration(labelText: 'Title')),
               DropdownButtonFormField<String>(
-                initialValue: category,
+                value: category,
                 items: [
                   'Vet', 'Farrier', 'Dental', 'Deworm',
                   'Vaccine', 'Supplement Refill', 'General'
@@ -956,9 +952,8 @@ class _RemindersTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 730)),
                   );
-                  if (picked != null) {
+                  if (picked != null)
                     setState(() => dueDate = picked);
-                  }
                 },
               ),
               const SizedBox(height: 16),
@@ -977,17 +972,11 @@ class _RemindersTab extends StatelessWidget {
                         : notesCtrl.text.trim(),
                   );
                   final docId = await fs.addReminder(reminder);
-                  // Schedule TWO notifications:
-                  // 1. 24 hours before due date
-                  // 2. At 9:00 AM on the due date
-                  await notifs.scheduleBothNotifications(
-                    baseId: docId.hashCode,
+                  await notifs.scheduleReminderNotifications(
+                    baseId: docId.hashCode.abs(),
                     title: '${horse.name}: ${reminder.title}',
-                    beforeBody:
-                        '${reminder.category} reminder due tomorrow.',
-                    onDayBody:
-                        '${reminder.category} reminder is due today!',
                     dueDate: dueDate,
+                    category: reminder.category,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
@@ -1016,9 +1005,8 @@ class _RemindersTab extends StatelessWidget {
             children: reminders.map((r) {
               Color? cardColor;
               if (r.isOverdue) cardColor = Colors.red.shade50;
-              if (r.isDueSoon) {
+              if (r.isDueSoon)
                 cardColor = Colors.yellow.shade50;
-              }
               return Card(
                 color: cardColor,
                 child: CheckboxListTile(
@@ -1106,7 +1094,7 @@ class _BarnTasksTab extends StatelessWidget {
                   decoration: const InputDecoration(
                       labelText: 'Assigned to (name)')),
               DropdownButtonFormField<String>(
-                initialValue: category,
+                value: category,
                 items: BarnTask.categories
                     .map((c) => DropdownMenuItem(
                         value: c, child: Text(c)))
@@ -1134,9 +1122,8 @@ class _BarnTasksTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 365)),
                   );
-                  if (picked != null) {
+                  if (picked != null)
                     setState(() => dueDate = picked);
-                  }
                 },
               ),
               const SizedBox(height: 16),
@@ -1160,16 +1147,12 @@ class _BarnTasksTab extends StatelessWidget {
                   // 2. At 9:00 AM on the due date
                   final notifs =
                       context.read<NotificationService>();
-                  await notifs.scheduleBothNotifications(
+                  await notifs.scheduleBarnTaskNotifications(
                     baseId:
-                        '${horse.id}_${titleCtrl.text}'.hashCode,
-                    title:
-                        'Barn Task: ${titleCtrl.text.trim()}',
-                    beforeBody:
-                        '$category task for ${horse.name} is due tomorrow.',
-                    onDayBody:
-                        '$category task for ${horse.name} is due today!',
+                        '${horse.id}_${titleCtrl.text}'.hashCode.abs(),
+                    taskTitle: titleCtrl.text.trim(),
                     dueDate: dueDate,
+                    assignedTo: assignedCtrl.text.trim(),
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },

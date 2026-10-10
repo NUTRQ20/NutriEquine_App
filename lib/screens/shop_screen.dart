@@ -16,7 +16,8 @@ class ShopScreen extends StatelessWidget {
       dosage: 'Atleast 1 scoop daily',
       duration: '60-day supply',
       imagePath: 'assets/images/products/musclelogo.png',
-      productUrl: 'https://nutriequine.com/products/nutriequine-muscle-joint-supplement-powder',
+      productUrl:
+          'https://nutriequine.com/products/nutriequine-muscle-joint-supplement-powder',
       color: Color(0xFF2F5233),
     )
   ];
@@ -31,7 +32,8 @@ class ShopScreen extends StatelessWidget {
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not open the page. Check your internet connection.'),
+            content: Text(
+                'Could not open the page. Check your internet connection.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -88,8 +90,8 @@ class ShopScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   ElevatedButton.icon(
-                    onPressed: () => _openUrl(
-                        context, 'https://nutriequine.com/collections/shop-all'),
+                    onPressed: () => _openUrl(context,
+                        'https://nutriequine.com/collections/shop-all'),
                     icon: const Icon(Icons.open_in_browser, size: 18),
                     label: const Text('Browse all products'),
                     style: ElevatedButton.styleFrom(
@@ -147,12 +149,13 @@ class _ProductCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Product image ───────────────────────────────────────
-          SizedBox(
+          Container(
             width: double.infinity,
             height: 200,
+            color: Colors.white,
             child: Image.asset(
               product.imagePath,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain, // ← was BoxFit.cover (was cropping)
               errorBuilder: (_, __, ___) => Container(
                 color: product.color.withValues(alpha: 0.08),
                 child: Center(
@@ -240,8 +243,8 @@ class _ProductCard extends StatelessWidget {
                     icon: const Icon(Icons.shopping_cart_outlined, size: 18),
                     label: const Text(
                       'Buy / Purchase',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: product.color,
@@ -256,9 +259,7 @@ class _ProductCard extends StatelessWidget {
                 Center(
                   child: Text(
                     'Opens nutriequine.com for checkout',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                   ),
                 ),
               ],
@@ -275,14 +276,12 @@ class _Chip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _Chip(
-      {required this.icon, required this.label, required this.color});
+  const _Chip({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
