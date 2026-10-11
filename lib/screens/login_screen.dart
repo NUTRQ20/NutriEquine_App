@@ -121,11 +121,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Handles Google Sign In.
   ///
-  /// Three outcomes:
-  ///   1. null returned    → user cancelled picker → do nothing
-  ///   2. GoogleUserNotFoundException thrown → user has no account
-  ///      → show first-time message, stay on login screen
-  ///   3. UserCredential returned → existing user → route to app
+  /// Outcomes:
+  ///   1. null returned              → user cancelled picker → do nothing
+  ///   2. GoogleUserNotFoundException → new user, no app account → show dialog
+  ///   3. GoogleAccountLinkException → registered with password, not Google
+  ///                                   → tell them to sign in with password
+  ///   4. UserCredential returned    → existing registered user → route to app
   Future<void> _submitGoogle() async {
     setState(() {
       _loading = true;
@@ -138,23 +139,35 @@ class _LoginScreenState extends State<LoginScreen> {
       final credential = await auth.signInWithGoogle();
 
       if (credential == null) {
-        // User cancelled the Google account picker — not an error
+        // User cancelled the Google account picker — not an error. (Case D)
         if (mounted) setState(() => _loading = false);
         return;
       }
 
-      // Existing user — route normally
+      // Existing registered user authenticated successfully. (Case C)
       await _routeAfterAuth();
     } on GoogleUserNotFoundException catch (e) {
-      // ── New user or deleted account ───────────────────────────
-      // Google email not found in our database.
-      // Do NOT log them in. Show first-time message.
+      // New user — Google account has no matching app registration.
+      // No Firebase account was created (or it was cleaned up).
+      // Show dialog; pre-fill email so they can register easily.
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = null; // clear field error — we show dialog instead
+          _error = null;
         });
         await _showFirstTimeGoogleDialog(e.email);
+      }
+    } on GoogleAccountLinkException catch (e) {
+      // The user registered with email/password, not Google.
+      // Their account exists — they just need to use their password.
+      if (mounted) {
+        _emailCtrl.text = e.email == 'unknown' ? '' : e.email;
+        setState(() {
+          _loading = false;
+          _isSignUp = false; // ensure sign-in mode
+          _error = 'This email is registered with a password. '
+              'Please sign in with your email and password instead.';
+        });
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
