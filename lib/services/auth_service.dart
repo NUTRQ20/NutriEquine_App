@@ -19,6 +19,13 @@ class GoogleAccountLinkException implements Exception {
   const GoogleAccountLinkException(this.email);
 }
 
+/// Thrown by signUpWithGoogle() when the Google account already has a
+/// fully registered app profile. The user should log in, not sign up.
+class GoogleUserAlreadyRegisteredException implements Exception {
+  final String email;
+  const GoogleUserAlreadyRegisteredException(this.email);
+}
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -33,7 +40,11 @@ class AuthService {
   Future<UserCredential> signUp(String email, String password) =>
       _auth.createUserWithEmailAndPassword(email: email, password: password);
 
-  /// Signs in with Google.
+  // ─────────────────────────────────────────────────────────────────────────
+  // Google Sign-In (LOGIN — for existing registered users)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Signs in with Google for EXISTING registered users (login flow).
   ///
   /// WHY THE PREVIOUS APPROACH (fetchSignInMethodsForEmail) BROKE:
   ///
@@ -56,33 +67,13 @@ class AuthService {
   ///
   ///   Step 4b — Firestore record MISSING AND isNewUser == true:
   ///               signInWithCredential just created a brand-new Firebase Auth
-  ///               account. We must DELETE it to clean up, then redirect to
-  ///               registration. The user can register normally with email/password.
-  ///               (Case A — new user)
+  ///               account. We must DELETE it to clean up, then throw
+  ///               GoogleUserNotFoundException. (Case A — no account)
   ///
   ///   Step 4c — Firestore record MISSING AND isNewUser == false:
   ///               Firebase Auth account already existed (from a previous partial
   ///               Google sign-in) but registration was never completed.
-  ///               Sign out and redirect to registration. (Case A edge)
-  ///
-  /// WHY DELETING THE ACCOUNT IN CASE 4b IS CORRECT:
-  ///   This is NOT a workaround. The Firebase Auth account was created
-  ///   unintentionally by signInWithCredential(). The user has no app profile.
-  ///   Deleting the just-created account restores the pre-sign-in state exactly.
-  ///   The user can then register with email/password using the same email
-  ///   without getting "email-already-in-use".
-  ///   This is fundamentally different from deleting an account that belongs to
-  ///   a registered user — we only delete it when isNewUser == true AND no
-  ///   Firestore profile exists.
-  ///
-  /// HANDLING account-exists-with-different-credential:
-  ///   If the user registered with email/password and then tries Google Sign-In,
-  ///   Firebase throws this error because the email is already linked to the
-  ///   password provider. We handle this by linking the Google credential to
-  ///   the existing password account after signing in with email/password.
-  ///   However, since we don't have the password here, the cleanest approach
-  ///   is to sign in with the existing account via email link after checking
-  ///   Firestore — explained in the error handler below.
+  ///               Sign out and throw GoogleUserNotFoundException. (Case A edge)
   Future<UserCredential?> signInWithGoogle() async {
     // Force account picker to show every time
     final googleSignIn = GoogleSignIn();
@@ -109,41 +100,33 @@ class AuthService {
     bool isNewFirebaseAccount = false;
 
     try {
-      // Step 2: Sign into Firebase with Google credential.
+      // Sign into Firebase with Google credential.
       // If a Firebase Auth account already exists for this Google identity,
       // this signs into it. If not, it creates one.
       userCredential = await _auth.signInWithCredential(credential);
       isNewFirebaseAccount =
           userCredential.additionalUserInfo?.isNewUser ?? false;
+
     } on FirebaseAuthException catch (e) {
       await googleSignIn.signOut();
 
       if (e.code == 'account-exists-with-different-credential') {
         // The email already exists in Firebase Auth under a DIFFERENT provider
         // (e.g. the user registered with email/password).
-        // Check if this user has a completed Firestore app profile.
-        // If yes → they are a registered user; let them know to sign in
-        // with their password (we cannot sign them in via Google alone
-        // without linking, which requires their password).
-        // If no → treat as new user.
         final registeredEmail = e.email?.toLowerCase().trim() ?? googleEmail;
         final profileExists =
             await _checkUserExistsByEmailUnauthenticated(registeredEmail);
         if (profileExists) {
-          // Registered user trying Google Login on a password account.
-          // Throw a specific exception so the UI can show the right message.
           throw GoogleAccountLinkException(registeredEmail);
         } else {
-          // No app profile — treat as new user.
           throw GoogleUserNotFoundException(registeredEmail);
         }
       }
 
-      // Any other FirebaseAuthException — re-throw so the UI shows a real error.
       rethrow;
     }
 
-    // Step 3: We are now authenticated. Retrieve the Firebase UID.
+    // Step 3: Retrieve UID.
     final uid = userCredential.user?.uid ?? '';
     final firebaseEmail =
         userCredential.user?.email?.toLowerCase().trim() ?? googleEmail;
@@ -154,39 +137,139 @@ class AuthService {
     }
 
     // Step 4: Check Firestore for the app user record.
-    // Look up by UID (primary) and email (fallback).
     bool userExists = false;
     try {
       userExists = await _checkUserExistsInDatabase(uid, firebaseEmail);
     } catch (e) {
-      // Database error — do NOT treat this as "user not found".
-      // Sign out and re-throw so the UI shows a real error.
       await _fullSignOut(googleSignIn);
       rethrow;
     }
 
     if (!userExists) {
       if (isNewFirebaseAccount) {
-        // Step 4b: A brand-new Firebase Auth account was just created by
-        // signInWithCredential(). No Firestore profile exists. Delete the
-        // newly created account so the email remains free for registration.
+        // Step 4b: Delete the just-created Firebase Auth account (legitimate
+        // cleanup — not a workaround) and throw so the UI can redirect to
+        // sign-up.
         try {
           await userCredential.user?.delete();
-        } catch (_) {
-          // If delete fails, sign out at minimum.
-        }
+        } catch (_) {}
         await _fullSignOut(googleSignIn);
-        throw GoogleUserNotFoundException(firebaseEmail); // Case A
+        throw GoogleUserNotFoundException(firebaseEmail);
       } else {
-        // Step 4c: Firebase Auth account pre-existed but no Firestore profile.
-        // (Edge case from a previous partial Google sign-in that was cleaned
-        // up imperfectly.) Sign out and redirect to registration.
+        // Step 4c: Pre-existing Firebase Auth account but no Firestore profile.
         await _fullSignOut(googleSignIn);
-        throw GoogleUserNotFoundException(firebaseEmail); // Case A edge
+        throw GoogleUserNotFoundException(firebaseEmail);
       }
     }
 
-    // Step 4a: Firestore profile exists — returning registered user. (Case C)
+    // Step 4a: Firestore profile exists — returning registered user.
+    return userCredential;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Google Sign-Up (SIGN-UP — for new users only)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Signs up with Google for NEW users (sign-up flow).
+  ///
+  /// This is intentionally separate from signInWithGoogle() so that:
+  ///   - New users can authenticate via Google and proceed directly to the
+  ///     profile completion page WITHOUT entering email/password.
+  ///   - Existing registered users are correctly identified and redirected
+  ///     to the login flow.
+  ///
+  /// Outcomes:
+  ///   D. null                                → user cancelled → return null
+  ///   A. NEW Google user (no Firestore)      → return UserCredential (caller
+  ///                                            navigates to UserDetailsScreen)
+  ///   B. EXISTING Google user (has profile)  → throw GoogleUserAlreadyRegisteredException
+  ///   C. Email/password account exists       → throw GoogleAccountLinkException
+  ///   E. Error                               → re-throw
+  ///
+  /// NOTE: This method does NOT delete any Firebase Auth accounts.
+  ///   For a new user, signInWithCredential creates an account that we KEEP
+  ///   (unlike the login flow where we clean it up). The profile is then saved
+  ///   to Firestore by UserDetailsScreen after the user completes their profile.
+  Future<UserCredential?> signUpWithGoogle() async {
+    // Force account picker to show every time
+    final googleSignIn = GoogleSignIn();
+    await googleSignIn.signOut();
+
+    // Step 1: Show Google account picker
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) return null; // cancelled — Case D
+
+    final googleEmail = googleUser.email.toLowerCase().trim();
+    if (googleEmail.isEmpty) {
+      await googleSignIn.signOut();
+      throw Exception('Could not retrieve Google email.');
+    }
+
+    // Step 2: Get Google OAuth credentials
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    UserCredential userCredential;
+
+    try {
+      // Sign into Firebase with Google credential.
+      // For a genuinely new Google identity this creates a Firebase Auth
+      // account — which is exactly what we want for sign-up.
+      userCredential = await _auth.signInWithCredential(credential);
+
+    } on FirebaseAuthException catch (e) {
+      await googleSignIn.signOut();
+
+      if (e.code == 'account-exists-with-different-credential') {
+        // This Google email is already linked to an email/password account.
+        final registeredEmail = e.email?.toLowerCase().trim() ?? googleEmail;
+        final profileExists =
+            await _checkUserExistsByEmailUnauthenticated(registeredEmail);
+        if (profileExists) {
+          throw GoogleAccountLinkException(registeredEmail); // Case C
+        } else {
+          // No complete profile — treat as new user but can't proceed via
+          // Google here; throw a generic error.
+          throw Exception(
+              'This email is already linked to a different sign-in method.');
+        }
+      }
+
+      rethrow;
+    }
+
+    // Step 3: Check Firestore for an existing app user record.
+    final uid = userCredential.user?.uid ?? '';
+    final firebaseEmail =
+        userCredential.user?.email?.toLowerCase().trim() ?? googleEmail;
+
+    if (uid.isEmpty) {
+      await _fullSignOut(googleSignIn);
+      throw Exception('Authentication failed. Please try again.');
+    }
+
+    bool userExists = false;
+    try {
+      userExists = await _checkUserExistsInDatabase(uid, firebaseEmail);
+    } catch (e) {
+      await _fullSignOut(googleSignIn);
+      rethrow;
+    }
+
+    if (userExists) {
+      // Case B: This Google account is already fully registered.
+      // Sign out (they should use the login flow) and throw.
+      await _fullSignOut(googleSignIn);
+      throw GoogleUserAlreadyRegisteredException(firebaseEmail);
+    }
+
+    // Case A: No Firestore profile found — this is a genuinely new user.
+    // Return the UserCredential. The Firebase Auth account stays active.
+    // UserDetailsScreen will call FirestoreService.saveUserProfile() to
+    // complete the registration.
     return userCredential;
   }
 
@@ -234,18 +317,16 @@ class AuthService {
 
   /// Signs out from Firebase Auth and Google Sign In.
   Future<void> _fullSignOut(GoogleSignIn googleSignIn) async {
-    try {
-      await googleSignIn.signOut();
-    } catch (_) {}
-    try {
-      await _auth.signOut();
-    } catch (_) {}
+    try { await googleSignIn.signOut(); } catch (_) {}
+    try { await _auth.signOut(); } catch (_) {}
   }
+
 
   /// Signs in with Facebook.
   Future<UserCredential?> signInWithFacebook() async {
     final result = await FacebookAuth.instance.login();
-    if (result.status != LoginStatus.success || result.accessToken == null) {
+    if (result.status != LoginStatus.success ||
+        result.accessToken == null) {
       return null;
     }
     final credential =
@@ -256,15 +337,9 @@ class AuthService {
   /// Signs out from Firebase, Google, and Facebook.
   /// Also clears locally stored session flags.
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
-    try {
-      await FacebookAuth.instance.logOut();
-    } catch (_) {}
-    try {
-      await _auth.signOut();
-    } catch (_) {}
+    try { await _googleSignIn.signOut(); } catch (_) {}
+    try { await FacebookAuth.instance.logOut(); } catch (_) {}
+    try { await _auth.signOut(); } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('profile_completed');
