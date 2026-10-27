@@ -9,7 +9,6 @@ import '../models/barn_task.dart';
 import '../services/firestore_service.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
-import '../services/feed_auto_update_service.dart';
 import 'analytics_screen.dart';
 import 'shared_access_screen.dart';
 import 'supplement_protocol_screen.dart';
@@ -211,7 +210,6 @@ class _InfoTile extends StatelessWidget {
 }
 
 // ─────────────────────────── FEED PLAN TAB ───────────────────────────
-// ─────────────────────────── FEED PLAN TAB ───────────────────────────
 class _FeedPlanTab extends StatefulWidget {
   final Horse horse;
   const _FeedPlanTab({required this.horse});
@@ -338,7 +336,6 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
     color: lowStock ? Colors.orange : null,
     size: 20,
   ),
-  // Title — item name only
   title: Text(
     e.itemName,
     style: const TextStyle(
@@ -346,12 +343,10 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
       fontSize: 14,
     ),
   ),
-  // Subtitle — dosage, time, duration on separate lines
   subtitle: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const SizedBox(height: 2),
-      // Dosage on its own line
       Text(
         e.dosage,
         style: const TextStyle(
@@ -360,14 +355,12 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
         ),
       ),
       const SizedBox(height: 2),
-      // Time of day + last given
       Text(
         justMarked
             ? '${e.timeOfDay} · just given ✅'
             : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
         style: const TextStyle(fontSize: 12),
       ),
-      // Days remaining / duration
       if (e.daysRemaining != null) ...[
         const SizedBox(height: 2),
         Text(
@@ -384,7 +377,6 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
           ),
         ),
       ],
-      // Duration from daysOfSupply
       if (e.daysOfSupply != null) ...[
         const SizedBox(height: 2),
         Text(
@@ -401,6 +393,9 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // ── CHECK BUTTON ─────────────────────────────────
+                      // This is the ONLY place daysRemaining decrements.
+                      // The auto-update service NEVER modifies this value.
                       IconButton(
                         icon: Icon(
                           justMarked
@@ -410,7 +405,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                               ? Colors.green
                               : null,
                         ),
-                        tooltip: 'Mark given',
+                        tooltip: 'Mark given (decrements stock by 1)',
                         onPressed: () async {
                           // Instant UI feedback
                           setState(() =>
@@ -418,20 +413,20 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           await fs.markFeedGiven(e.id);
                           if (e.daysRemaining != null &&
                               e.daysRemaining! > 0) {
-                            // Calculate NEW value after decrement
+                            // Decrement by 1 (user confirmed feed was given)
                             final newDays =
                                 e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
                                 e.id, e.daysRemaining!);
-                            // Schedule restock alert for TOMORROW 8 AM.
-                            // This fires even when the app is completely closed
-                            // because it uses Android AlarmManager via zonedSchedule().
-                            // Old showInstantNotification() only worked in foreground.
-                            await FeedAutoUpdateService().onFeedItemTicked(
-                              docId: e.id,
-                              itemName: e.itemName,
-                              newDaysRemaining: newDays,
-                            );
+                            // Schedule low-stock alert if needed
+                            if (newDays <= 7) {
+                              await NotificationService()
+                                  .scheduleRestockAlert(
+                                id: e.id.hashCode,
+                                itemName: e.itemName,
+                                daysRemaining: newDays,
+                              );
+                            }
                           }
                         },
                       ),
@@ -467,6 +462,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
     );
   }
 }
+
 // ─────────────────────────── WELLNESS TAB ───────────────────────────
 class _WellnessTab extends StatelessWidget {
   final Horse horse;
@@ -897,7 +893,16 @@ class _RemindersTab extends StatelessWidget {
     final titleCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     String category = 'Vet';
-    DateTime dueDate = DateTime.now().add(const Duration(days: 7));
+
+    // Default: 7 days from now at current time of day
+    final now = DateTime.now();
+    DateTime dueDate = DateTime(
+      now.year, now.month, now.day,
+      now.hour, now.minute,
+    );
+    // The time component is tracked separately for display
+    TimeOfDay dueTime = TimeOfDay(hour: now.hour, minute: now.minute);
+
     final fs = context.read<FirestoreService>();
     final notifs = context.read<NotificationService>();
 
@@ -939,10 +944,12 @@ class _RemindersTab extends StatelessWidget {
                   controller: notesCtrl,
                   decoration: const InputDecoration(
                       labelText: 'Notes (optional)')),
+
+              // ── DATE PICKER ────────────────────────────────────
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
-                    'Due: ${DateFormat.yMMMd().format(dueDate)}'),
+                    'Date: ${DateFormat.yMMMd().format(dueDate)}'),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
@@ -952,10 +959,45 @@ class _RemindersTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 730)),
                   );
-                  if (picked != null)
-                    setState(() => dueDate = picked);
+                  if (picked != null) {
+                    setState(() {
+                      // Keep the already-chosen time, just update date
+                      dueDate = DateTime(
+                        picked.year, picked.month, picked.day,
+                        dueTime.hour, dueTime.minute,
+                      );
+                    });
+                  }
                 },
               ),
+
+              // ── TIME PICKER ────────────────────────────────────
+              // The time selected here is the exact time of the event.
+              // The "24 hours before" notification fires at this same
+              // time of day, one day earlier — NOT at midnight.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                    'Time: ${dueTime.format(ctx)}'),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: ctx,
+                    initialTime: dueTime,
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      dueTime = picked;
+                      // Combine the current date with the new time
+                      dueDate = DateTime(
+                        dueDate.year, dueDate.month, dueDate.day,
+                        picked.hour, picked.minute,
+                      );
+                    });
+                  }
+                },
+              ),
+
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () async {
@@ -965,18 +1007,28 @@ class _RemindersTab extends StatelessWidget {
                     horseId: horse.id,
                     ownerId: fs.uid,
                     title: titleCtrl.text.trim(),
-                    dueDate: dueDate,
+                    dueDate: dueDate,   // now has both date AND time
                     category: category,
                     notes: notesCtrl.text.trim().isEmpty
                         ? null
                         : notesCtrl.text.trim(),
                   );
                   final docId = await fs.addReminder(reminder);
+
+                  // Schedule notifications using the correct method:
+                  //
+                  //   Notification 1: fires at (dueDate − 24h)
+                  //     e.g. if dueDate = Nov 5 at 3:00 PM,
+                  //          notification fires Nov 4 at 3:00 PM
+                  //
+                  //   Notification 2: fires at 9:00 AM on the due date
+                  //
+                  // Both use the exact dueDate (with time), NOT just the day.
                   await notifs.scheduleReminderNotifications(
-                    baseId: docId.hashCode.abs(),
+                    baseId: docId.hashCode,
                     title: '${horse.name}: ${reminder.title}',
                     dueDate: dueDate,
-                    category: reminder.category,
+                    category: category,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
@@ -1011,11 +1063,16 @@ class _RemindersTab extends StatelessWidget {
                 color: cardColor,
                 child: CheckboxListTile(
                   value: r.isComplete,
-                  onChanged: (_) {
+                  onChanged: (_) async {
                     if (r.isComplete) {
                       fs.uncompleteReminder(r.id);
                     } else {
                       fs.completeReminder(r.id);
+                      // Cancel scheduled notifications when done
+                      await context
+                          .read<NotificationService>()
+                          .cancelReminderNotifications(
+                              r.id.hashCode);
                     }
                   },
                   title: Text(
@@ -1030,7 +1087,7 @@ class _RemindersTab extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    '${r.category} - Due ${DateFormat.yMMMd().format(r.dueDate)}'
+                    '${r.category} - Due ${DateFormat.yMMMd().add_jm().format(r.dueDate)}'
                     '${r.isOverdue ? " - OVERDUE" : r.isDueSoon ? " - DUE SOON" : ""}'
                     '${r.notes != null ? "\n${r.notes}" : ""}',
                     style: TextStyle(
@@ -1040,7 +1097,14 @@ class _RemindersTab extends StatelessWidget {
                   isThreeLine: r.notes != null,
                   secondary: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: () => fs.deleteReminder(r.id),
+                    onPressed: () async {
+                      // Cancel notifications before deleting
+                      await context
+                          .read<NotificationService>()
+                          .cancelReminderNotifications(
+                              r.id.hashCode);
+                      fs.deleteReminder(r.id);
+                    },
                   ),
                 ),
               );
@@ -1066,7 +1130,15 @@ class _BarnTasksTab extends StatelessWidget {
     final assignedCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     String category = 'Feeding';
-    DateTime dueDate = DateTime.now();
+
+    // Default: today at current time of day
+    final now = DateTime.now();
+    DateTime dueDate = DateTime(
+      now.year, now.month, now.day,
+      now.hour, now.minute,
+    );
+    TimeOfDay dueTime = TimeOfDay(hour: now.hour, minute: now.minute);
+
     final fs = context.read<FirestoreService>();
 
     showModalBottomSheet(
@@ -1108,10 +1180,12 @@ class _BarnTasksTab extends StatelessWidget {
                   controller: notesCtrl,
                   decoration: const InputDecoration(
                       labelText: 'Notes (optional)')),
+
+              // ── DATE PICKER ────────────────────────────────────
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
-                    'Due: ${DateFormat.yMMMd().format(dueDate)}'),
+                    'Date: ${DateFormat.yMMMd().format(dueDate)}'),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
@@ -1122,37 +1196,79 @@ class _BarnTasksTab extends StatelessWidget {
                     lastDate: DateTime.now()
                         .add(const Duration(days: 365)),
                   );
-                  if (picked != null)
-                    setState(() => dueDate = picked);
+                  if (picked != null) {
+                    setState(() {
+                      dueDate = DateTime(
+                        picked.year, picked.month, picked.day,
+                        dueTime.hour, dueTime.minute,
+                      );
+                    });
+                  }
                 },
               ),
+
+              // ── TIME PICKER ────────────────────────────────────
+              // The time selected here is the exact time of the task.
+              // The "24 hours before" notification fires at this same
+              // time of day, one day earlier — NOT at midnight.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                    'Time: ${dueTime.format(ctx)}'),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final picked = await showTimePicker(
+                    context: ctx,
+                    initialTime: dueTime,
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      dueTime = picked;
+                      dueDate = DateTime(
+                        dueDate.year, dueDate.month, dueDate.day,
+                        picked.hour, picked.minute,
+                      );
+                    });
+                  }
+                },
+              ),
+
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () async {
                   if (titleCtrl.text.trim().isEmpty) return;
-                  await fs.addBarnTask(BarnTask(
+                  final task = BarnTask(
                     id: const Uuid().v4(),
                     horseId: horse.id,
                     ownerId: fs.uid,
                     title: titleCtrl.text.trim(),
                     category: category,
                     assignedTo: assignedCtrl.text.trim(),
-                    dueDate: dueDate,
+                    dueDate: dueDate,  // now has both date AND time
                     notes: notesCtrl.text.trim().isEmpty
                         ? null
                         : notesCtrl.text.trim(),
-                  ));
-                  // Schedule TWO notifications:
-                  // 1. 24 hours before due date
-                  // 2. At 9:00 AM on the due date
+                  );
+                  await fs.addBarnTask(task);
+
+                  // Schedule notifications using the correct method:
+                  //
+                  //   Notification 1: fires at (dueDate − 24h)
+                  //     e.g. if dueDate = Nov 5 at 2:00 PM,
+                  //          notification fires Nov 4 at 2:00 PM
+                  //
+                  //   Notification 2: fires at 9:00 AM on the due date
+                  //
+                  // Both use the exact dueDate (with time), NOT just the day.
                   final notifs =
                       context.read<NotificationService>();
                   await notifs.scheduleBarnTaskNotifications(
-                    baseId:
-                        '${horse.id}_${titleCtrl.text}'.hashCode.abs(),
-                    taskTitle: titleCtrl.text.trim(),
+                    baseId: task.id.hashCode,
+                    taskTitle: task.title,
                     dueDate: dueDate,
-                    assignedTo: assignedCtrl.text.trim(),
+                    assignedTo: assignedCtrl.text.trim().isEmpty
+                        ? null
+                        : assignedCtrl.text.trim(),
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
@@ -1185,11 +1301,16 @@ class _BarnTasksTab extends StatelessWidget {
                     : null,
                 child: CheckboxListTile(
                   value: t.isComplete,
-                  onChanged: (_) {
+                  onChanged: (_) async {
                     if (t.isComplete) {
                       fs.uncompleteBarnTask(t.id);
                     } else {
                       fs.completeBarnTask(t.id);
+                      // Cancel scheduled notifications when done
+                      await context
+                          .read<NotificationService>()
+                          .cancelBarnTaskNotifications(
+                              t.id.hashCode);
                     }
                   },
                   title: Text(
@@ -1200,14 +1321,21 @@ class _BarnTasksTab extends StatelessWidget {
                             : null),
                   ),
                   subtitle: Text(
-                    '${t.category} - ${t.assignedTo.isNotEmpty ? "-> ${t.assignedTo}" : "Unassigned"} - ${DateFormat.yMMMd().format(t.dueDate)}'
+                    '${t.category} - ${t.assignedTo.isNotEmpty ? "-> ${t.assignedTo}" : "Unassigned"} - ${DateFormat.yMMMd().add_jm().format(t.dueDate)}'
                     '${t.isOverdue && !t.isComplete ? " - OVERDUE" : ""}'
                     '${t.notes != null ? "\n${t.notes}" : ""}',
                   ),
                   isThreeLine: t.notes != null,
                   secondary: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: () => fs.deleteBarnTask(t.id),
+                    onPressed: () async {
+                      // Cancel notifications before deleting
+                      await context
+                          .read<NotificationService>()
+                          .cancelBarnTaskNotifications(
+                              t.id.hashCode);
+                      fs.deleteBarnTask(t.id);
+                    },
                   ),
                 ),
               );

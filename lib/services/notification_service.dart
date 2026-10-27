@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -303,15 +305,15 @@ class NotificationService {
       scheduledDate: before,
     );
 
-    // Notification 2: 9:00 AM on the day.
-    // If 9 AM on due date is already past, fire 2 hours from now as fallback.
+    // Notification 2: at the user's set time on the due day.
+    // If that time is already past, fire 2 hours from now as fallback.
     var onDay = tz.TZDateTime(
       tz.local,
       dueDate.year,
       dueDate.month,
       dueDate.day,
-      9,
-      0,
+      dueDate.hour,    // user's chosen hour
+      dueDate.minute,  // user's chosen minute
     );
     if (onDay.isBefore(now)) {
       onDay = now.add(const Duration(hours: 2));
@@ -367,15 +369,15 @@ class NotificationService {
       scheduledDate: before,
     );
 
-    // Notification 2: 9:00 AM on the day.
-    // If 9 AM on due date is already past, fire 2 hours from now as fallback.
+    // Notification 2: at the user's set time on the due day.
+    // If that time is already past, fire 2 hours from now as fallback.
     var onDay = tz.TZDateTime(
       tz.local,
       dueDate.year,
       dueDate.month,
       dueDate.day,
-      9,
-      0,
+      dueDate.hour,    // user's chosen hour
+      dueDate.minute,  // user's chosen minute
     );
     if (onDay.isBefore(now)) {
       onDay = now.add(const Duration(hours: 2));
@@ -498,5 +500,81 @@ class NotificationService {
       body: body,
       scheduledDate: scheduledTime,
     );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEED AUTO UPDATE SERVICE
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Runs on app start for logged-in users.
+//
+// IMPORTANT — what this service does and does NOT do:
+//
+//   ✅ Reads current daysRemaining from Firestore.
+//   ✅ Fires a low-stock notification if daysRemaining ≤ 7.
+//   ❌ NEVER decrements daysRemaining automatically.
+//
+// daysRemaining is decremented ONLY when the user explicitly taps
+// the check button (✓) on a feed entry in the Feed Plan tab.
+// That tap calls FirestoreService.decrementDaysRemaining() from
+// the UI — this service has no role in the countdown.
+//
+// The previous auto-decrement logic (subtracting days elapsed since
+// lastGivenAt) was removed because it reduced the stock counter
+// without the user confirming the feed was actually given.
+//
+// Usage in main.dart:
+//   import 'notification_service.dart';
+//   // Remove: import 'feed_auto_update_service.dart';
+//   await FeedAutoUpdateService().runDailyCheck();
+// ═══════════════════════════════════════════════════════════════════════════
+
+class FeedAutoUpdateService {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  String get _uid =>
+      FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  /// Call this every time the app opens (for a logged-in user).
+  ///
+  /// Reads all feed entries and fires a low-stock notification for
+  /// any entry whose daysRemaining is already ≤ 7.
+  /// No Firestore writes are performed here — stock counts are never
+  /// modified by this service.
+  Future<void> runDailyCheck() async {
+    if (_uid.isEmpty) return;
+
+    try {
+      final snap = await _db
+          .collection('feed_entries')
+          .where('ownerId', isEqualTo: _uid)
+          .get();
+
+      final notifService = NotificationService();
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final daysRemaining = data['daysRemaining'] as int?;
+
+        // Skip entries with no inventory tracking
+        if (daysRemaining == null) continue;
+
+        // Notify if stock is low — never modify the value
+        if (daysRemaining <= 7) {
+          final itemName =
+              data['itemName'] as String? ?? 'Supplement';
+
+          // Schedule alert for tomorrow 8 AM (works even when app is closed)
+          await notifService.scheduleRestockAlert(
+            id: doc.id.hashCode,
+            itemName: itemName,
+            daysRemaining: daysRemaining,
+          );
+        }
+      }
+    } catch (_) {
+      // Non-fatal — don't crash the app on startup
+    }
   }
 }
