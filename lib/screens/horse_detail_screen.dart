@@ -897,7 +897,7 @@ class _RemindersTab extends StatelessWidget {
     // Default: 7 days from now at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day + 7,
+      now.year, now.month, now.day,
       now.hour, now.minute,
     );
     // The time component is tracked separately for display
