@@ -422,7 +422,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                             if (newDays <= 7) {
                               await NotificationService()
                                   .scheduleRestockAlert(
-                                id: e.id.hashCode,
+                                id: e.id.hashCode.abs(),
                                 itemName: e.itemName,
                                 daysRemaining: newDays,
                               );
@@ -897,7 +897,7 @@ class _RemindersTab extends StatelessWidget {
     // Default: 7 days from now at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day,
+      now.year, now.month, now.day + 7,
       now.hour, now.minute,
     );
     // The time component is tracked separately for display

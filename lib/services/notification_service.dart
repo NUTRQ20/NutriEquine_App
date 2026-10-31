@@ -182,8 +182,10 @@ class NotificationService {
     required String itemName,
     required int daysRemaining,
   }) async {
-    // Cancel previous alert for this item
-    await _plugin.cancel(10000 + id);
+    // Always use positive ID — hashCode can be negative on some devices
+    final safeId = id.abs();
+    // Cancel previous alert for this item before scheduling new one
+    await _plugin.cancel(10000 + safeId);
 
     final now = tz.TZDateTime.now(tz.local);
     // Schedule for tomorrow 8:00 AM
@@ -205,7 +207,7 @@ class NotificationService {
         : 'Only $daysRemaining days of $itemName remaining. Time to reorder.';
 
     await _scheduleAt(
-      id: 10000 + id,
+      id: 10000 + safeId,
       title: title,
       body: body,
       scheduledDate: tomorrow8am,
@@ -566,8 +568,9 @@ class FeedAutoUpdateService {
               data['itemName'] as String? ?? 'Supplement';
 
           // Schedule alert for tomorrow 8 AM (works even when app is closed)
+          // .abs() ensures positive ID — hashCode can be negative on some devices
           await notifService.scheduleRestockAlert(
-            id: doc.id.hashCode,
+            id: doc.id.hashCode.abs(),
             itemName: itemName,
             daysRemaining: daysRemaining,
           );
