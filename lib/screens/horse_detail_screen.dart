@@ -296,6 +296,10 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                     daysRemaining: days,
                   );
                   await fs.addFeedEntry(entry);
+                  // Store horseName in the feed entry document
+                  // so runDailyCheck can use it for feeding time notifications
+                  await fs.updateFeedEntryHorseName(
+                      entry.id, widget.horse.name);
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
                 child: const Text('Save'),
@@ -444,8 +448,14 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         tooltip: 'Delete',
-                        onPressed: () =>
-                            fs.deleteFeedEntry(e.id),
+                        onPressed: () async {
+                          // Cancel feeding time + restock notifications on delete
+                          await NotificationService()
+                              .cancelFeedingTimeReminder(e.id.hashCode.abs());
+                          await NotificationService()
+                              .cancelNotification(10000 + e.id.hashCode.abs());
+                          fs.deleteFeedEntry(e.id);
+                        },
                       ),
                     ],
                   ),
@@ -897,7 +907,7 @@ class _RemindersTab extends StatelessWidget {
     // Default: 7 days from now at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day,
+      now.year, now.month, now.day + 7,
       now.hour, now.minute,
     );
     // The time component is tracked separately for display

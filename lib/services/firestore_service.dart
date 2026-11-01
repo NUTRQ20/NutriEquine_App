@@ -80,92 +80,6 @@ class FirestoreService {
     });
   }
 
-  /// Wraps [streamHorses] and automatically cleans up orphaned data
-  /// whenever a horse disappears from the stream.
-  ///
-  /// This handles the case where an admin deletes a horse document
-  /// directly from the Firebase Console. In that case the app's
-  /// [deleteHorse] method is never called, so feed entries, wellness
-  /// logs, reminders, training logs, and barn tasks for that horse
-  /// remain as orphaned documents.
-  ///
-  /// How it works:
-  ///   1. Keeps track of the previous set of horse IDs.
-  ///   2. Every time the stream emits a new list, compares it with
-  ///      the previous list.
-  ///   3. Any ID that was present before but is now missing means
-  ///      that horse was deleted externally.
-  ///   4. Calls [deleteHorse] for each missing ID to remove all
-  ///      related documents.
-  ///   5. The cleanup runs in the background — the UI updates
-  ///      immediately and the cleanup happens silently after.
-  Stream<List<Horse>> streamHorsesWithOrphanCleanup() {
-    Set<String> previousIds = {};
-    bool isFirstEmit = true;
-
-    return streamHorses().asyncMap((horses) async {
-      final currentIds = horses.map((h) => h.id).toSet();
-
-      if (isFirstEmit) {
-        // First emit — just record the initial set.
-        // Don't treat missing IDs as deletions because we have no
-        // previous state to compare against yet.
-        isFirstEmit = false;
-        previousIds = currentIds;
-        return horses;
-      }
-
-      // Find IDs that were present before but are now gone
-      final deletedIds = previousIds.difference(currentIds);
-
-      // Update previous IDs before running cleanup
-      previousIds = currentIds;
-
-      // Clean up orphaned data for each deleted horse
-      // Run in background — don't block the UI
-      for (final horseId in deletedIds) {
-        try {
-          // deleteHorse handles feed_entries, wellness_logs,
-          // care_reminders, training_logs, barn_tasks.
-          // The horse document itself is already gone (admin deleted it)
-          // so we only need to clean up related collections.
-          await _cleanupOrphanedHorseData(horseId);
-        } catch (_) {
-          // Non-fatal — continue with other horses
-        }
-      }
-
-      return horses;
-    });
-  }
-
-  /// Deletes all documents related to [horseId] from every
-  /// horse-dependent collection WITHOUT deleting the horse document
-  /// itself (because it may already be gone when called from orphan
-  /// cleanup).
-  Future<void> _cleanupOrphanedHorseData(String horseId) async {
-    final horseCollections = [
-      _feed,
-      _wellness,
-      _reminders,
-      _training,
-      _barnTasks,
-    ];
-
-    final toDelete = <DocumentReference>[];
-
-    for (final col in horseCollections) {
-      final snap = await col.where('horseId', isEqualTo: horseId).get();
-      for (final doc in snap.docs) {
-        toDelete.add(doc.reference);
-      }
-    }
-
-    if (toDelete.isEmpty) return;
-
-    await _commitInChunks(toDelete);
-  }
-
   Future<String> addHorse(Horse horse) async {
     final doc = await _horses.add(horse.toMap());
     return doc.id;
@@ -200,7 +114,8 @@ class FirestoreService {
 
     // Collect all related documents
     for (final col in horseCollections) {
-      final snap = await col.where('horseId', isEqualTo: horseId).get();
+      final snap =
+          await col.where('horseId', isEqualTo: horseId).get();
       for (final doc in snap.docs) {
         toDelete.add(doc.reference);
       }
@@ -220,8 +135,9 @@ class FirestoreService {
   /// remains after the user's account is removed.
   Future<void> deleteAllHorsesForUser(String ownerUid) async {
     // Find every horse owned by this user
-    final horsesSnap =
-        await _horses.where('ownerId', isEqualTo: ownerUid).get();
+    final horsesSnap = await _horses
+        .where('ownerId', isEqualTo: ownerUid)
+        .get();
 
     // Delete each horse and all its data using the canonical method
     for (final horseDoc in horsesSnap.docs) {
@@ -230,11 +146,10 @@ class FirestoreService {
   }
 
   /// Deletes the user profile document from the users collection.
-  /// This is a critical security step — once this document is deleted,
-  /// the Firestore rules block all CREATE and UPDATE operations for this user.
-  /// Throws on error so callers can handle and log failures.
   Future<void> deleteUserProfile(String userUid) async {
-    await _users.doc(userUid).delete();
+    try {
+      await _users.doc(userUid).delete();
+    } catch (_) {}
   }
 
   Future<void> updateHorsePhoto(String horseId, String photoUrl) =>
@@ -309,6 +224,11 @@ class FirestoreService {
 
   Future<void> addFeedEntry(FeedEntry entry) => _feed.add(entry.toMap());
 
+  /// Stores horseName on the feed entry document so notifications
+  /// can show the horse name without a separate Firestore lookup.
+  Future<void> updateFeedEntryHorseName(String entryId, String horseName) =>
+      _feed.doc(entryId).update({'horseName': horseName});
+
   Future<void> markFeedGiven(String entryId) => _feed
       .doc(entryId)
       .update({'lastGivenAt': DateTime.now().millisecondsSinceEpoch});
@@ -358,7 +278,10 @@ class FirestoreService {
 
   Stream<List<CareReminder>> streamAllReminders() {
     if (uid.isEmpty) return Stream.value([]);
-    return _reminders.where('ownerId', isEqualTo: uid).snapshots().map((snap) {
+    return _reminders
+        .where('ownerId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
       final list =
           snap.docs.map((d) => CareReminder.fromMap(d.id, d.data())).toList();
       list.sort((a, b) => a.dueDate.compareTo(b.dueDate));
@@ -399,8 +322,11 @@ class FirestoreService {
 
   Stream<List<TrainingLog>> streamAllTrainingLogs() {
     if (uid.isEmpty) return Stream.value([]);
-    return _training.where('ownerId', isEqualTo: uid).snapshots().map((snap) =>
-        snap.docs.map((d) => TrainingLog.fromMap(d.id, d.data())).toList());
+    return _training
+        .where('ownerId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => TrainingLog.fromMap(d.id, d.data())).toList());
   }
 
   // ─── BARN TASKS ──────────────────────────────────────────────────────
@@ -419,7 +345,10 @@ class FirestoreService {
 
   Stream<List<BarnTask>> streamAllBarnTasks() {
     if (uid.isEmpty) return Stream.value([]);
-    return _barnTasks.where('ownerId', isEqualTo: uid).snapshots().map((snap) {
+    return _barnTasks
+        .where('ownerId', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
       final list =
           snap.docs.map((d) => BarnTask.fromMap(d.id, d.data())).toList();
       list.sort((a, b) => a.dueDate.compareTo(b.dueDate));
@@ -446,7 +375,8 @@ class FirestoreService {
   Future<Map<String, List<Map<String, dynamic>>>> fetchAllUserData() async {
     final results = <String, List<Map<String, dynamic>>>{};
     Future<List<Map<String, dynamic>>> fetch(
-        CollectionReference<Map<String, dynamic>> ref, String field) async {
+        CollectionReference<Map<String, dynamic>> ref,
+        String field) async {
       final snap = await ref.where(field, isEqualTo: uid).get();
       return snap.docs.map((d) => {'_id': d.id, ...d.data()}).toList();
     }

@@ -220,12 +220,22 @@ class NotificationService {
   ///
   /// If that time has already passed today, schedules for tomorrow.
   /// This fires even when app is completely closed.
+  /// Schedules a DAILY repeating feeding time reminder.
+  ///
+  /// Fires every day at:
+  ///   AM     → 7:00 AM
+  ///   Midday → 12:00 PM
+  ///   PM     → 6:00 PM
+  ///
+  /// Uses matchDateTimeComponents: time so it repeats automatically
+  /// every day without needing to reschedule. Works in background.
   Future<void> scheduleFeedingTimeReminder({
     required int id,
     required String horseName,
     required String itemName,
     required String timeOfDay,
   }) async {
+    final safeId = id.abs();
     final now = tz.TZDateTime.now(tz.local);
 
     int hour;
@@ -246,10 +256,12 @@ class NotificationService {
         break;
     }
 
-    // Cancel old notification for this entry
-    await _plugin.cancel(baseId + id);
+    // Cancel old notification for this entry (all 3 time slots)
+    await _plugin.cancel(20000 + safeId);
+    await _plugin.cancel(21000 + safeId);
+    await _plugin.cancel(22000 + safeId);
 
-    // Schedule for today at the feeding hour
+    // Schedule at the feeding hour today; if already past, start tomorrow
     var scheduledTime = tz.TZDateTime(
       tz.local,
       now.year,
@@ -258,18 +270,49 @@ class NotificationService {
       hour,
       0,
     );
-
-    // If time already passed today, schedule for tomorrow
     if (scheduledTime.isBefore(now)) {
       scheduledTime = scheduledTime.add(const Duration(days: 1));
     }
 
-    await _scheduleAt(
-      id: baseId + id,
-      title: '🐴 Feeding Time: $horseName',
-      body: 'Time to give $itemName to $horseName.',
-      scheduledDate: scheduledTime,
-    );
+    // zonedSchedule with matchDateTimeComponents: time repeats DAILY
+    // at the same hour:minute without needing to reschedule each day.
+    try {
+      await _plugin.zonedSchedule(
+        baseId + safeId,
+        '🐴 Feeding Time: $horseName',
+        'Time to give $itemName to $horseName.',
+        scheduledTime,
+        _notifDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } on Exception {
+      // Fallback to inexact if exact alarms not permitted
+      try {
+        await _plugin.zonedSchedule(
+          baseId + safeId,
+          '🐴 Feeding Time: $horseName',
+          'Time to give $itemName to $horseName.',
+          scheduledTime,
+          _notifDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Cancel all feeding time notifications for a feed entry.
+  /// Call this when a feed entry is deleted.
+  Future<void> cancelFeedingTimeReminder(int id) async {
+    final safeId = id.abs();
+    await _plugin.cancel(20000 + safeId);
+    await _plugin.cancel(21000 + safeId);
+    await _plugin.cancel(22000 + safeId);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -555,20 +598,38 @@ class FeedAutoUpdateService {
 
       final notifService = NotificationService();
 
+      // First pass: cancel ALL existing restock notifications
+      // so no stale day counts remain from previous app opens.
+      for (final doc in snap.docs) {
+        await notifService.cancelNotification(
+            10000 + doc.id.hashCode.abs());
+      }
+
+      // Second pass: schedule fresh notifications with current counts
       for (final doc in snap.docs) {
         final data = doc.data();
         final daysRemaining = data['daysRemaining'] as int?;
+        final itemName = data['itemName'] as String? ?? 'Supplement';
+        final timeOfDay = data['timeOfDay'] as String? ?? 'AM';
+        final horseId = data['horseId'] as String? ?? '';
 
-        // Skip entries with no inventory tracking
+        // Schedule daily feeding time reminder (AM/Midday/PM)
+        // Fires every day at the user's chosen time slot.
+        // horseName stored in feed entry; falls back to itemName if not present.
+        final horseName = data['horseName'] as String? ?? itemName;
+        await notifService.scheduleFeedingTimeReminder(
+          id: doc.id.hashCode.abs(),
+          horseName: horseName,
+          itemName: itemName,
+          timeOfDay: timeOfDay,
+        );
+
+        // Skip restock if no inventory tracking
         if (daysRemaining == null) continue;
 
-        // Notify if stock is low — never modify the value
+        // Only notify restock if stock is low
         if (daysRemaining <= 7) {
-          final itemName =
-              data['itemName'] as String? ?? 'Supplement';
-
-          // Schedule alert for tomorrow 8 AM (works even when app is closed)
-          // .abs() ensures positive ID — hashCode can be negative on some devices
+          // Schedule alert for tomorrow 8 AM with CURRENT day count
           await notifService.scheduleRestockAlert(
             id: doc.id.hashCode.abs(),
             itemName: itemName,
