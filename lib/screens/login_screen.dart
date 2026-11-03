@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import 'home_screen.dart';
 import 'user_details_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -675,6 +676,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       _isSignUp
                           ? 'Already have an account? Sign in'
                           : 'New here? Create an account',
+                    ),
+                  ),
+
+                  // Privacy Policy link
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const PrivacyPolicyScreen()),
+                    ),
+                    child: const Text(
+                      'Privacy Policy',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey),
                     ),
                   ),
                 ],

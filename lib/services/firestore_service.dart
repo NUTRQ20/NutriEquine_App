@@ -170,6 +170,10 @@ class FirestoreService {
   Future<void> registerUserEmail() async {
     if (uid.isEmpty || userEmail.isEmpty) return;
     try {
+      // Upsert the canonical document — doc ID == UID, always.
+      // SetOptions(merge: true) means this is safe to call on every login:
+      // it creates the doc if missing, or updates only the listed fields
+      // if it already exists. No duplicate is ever created.
       await _users.doc(uid).set(
         {
           'email': userEmail,
@@ -178,6 +182,33 @@ class FirestoreService {
         },
         SetOptions(merge: true),
       );
+
+      // Remove any legacy/duplicate docs for the same email with a different
+      // document ID. Merges their profile fields into the canonical doc first.
+      await _deduplicateUserByEmail(userEmail, uid);
+    } catch (_) {}
+  }
+
+  /// Deletes any duplicate user documents that share the same email but have
+  /// a document ID other than [canonicalUid]. Called after every login to
+  /// self-heal old data. Merges name/photo/createdAt into canonical doc first.
+  Future<void> _deduplicateUserByEmail(
+      String email, String canonicalUid) async {
+    try {
+      final snap = await _users.where('email', isEqualTo: email).get();
+      for (final doc in snap.docs) {
+        if (doc.id == canonicalUid) continue; // skip the canonical one
+        // Preserve any profile fields the canonical doc might be missing
+        final oldData = doc.data();
+        final toMerge = <String, dynamic>{};
+        for (final key in ['name', 'photoUrl', 'createdAt']) {
+          if (oldData.containsKey(key)) toMerge[key] = oldData[key];
+        }
+        if (toMerge.isNotEmpty) {
+          await _users.doc(canonicalUid).set(toMerge, SetOptions(merge: true));
+        }
+        await doc.reference.delete();
+      }
     } catch (_) {}
   }
 

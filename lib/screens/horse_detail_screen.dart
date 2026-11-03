@@ -173,7 +173,7 @@ class _ProfileTab extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Answer 3 questions to get a personalized NutriEquine supplement recommendation.',
+          'Answer 3 questions to get a personalized EquineEdge supplement recommendation.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: Colors.grey),
         ),
@@ -248,7 +248,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
               TextField(
                 controller: itemCtrl,
                 decoration: const InputDecoration(
-                    labelText: 'Item name (e.g. NutriEquine GutCare)'),
+                    labelText: 'Item name (e.g. EquineEdge GutCare)'),
               ),
               TextField(
                 controller: dosageCtrl,
@@ -276,7 +276,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                 value: isSupplement,
                 onChanged: (v) =>
                     setSheetState(() => isSupplement = v),
-                title: const Text('This is a NutriEquine supplement'),
+                title: const Text('This is an EquineEdge supplement'),
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 16),
@@ -418,19 +418,25 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           if (e.daysRemaining != null &&
                               e.daysRemaining! > 0) {
                             // Decrement by 1 (user confirmed feed was given)
-                            final newDays =
-                                e.daysRemaining! - 1;
+                            final newDays = e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
                                 e.id, e.daysRemaining!);
-                            // Schedule low-stock alert if needed
+
+                            // Always cancel the old restock notification first
+                            // so the stale day count is never shown.
+                            await NotificationService().cancelNotification(
+                                10000 + e.id.hashCode.abs());
+
+                            // Reschedule with the NEW count if still low stock
                             if (newDays <= 7) {
-                              await NotificationService()
-                                  .scheduleRestockAlert(
+                              await NotificationService().scheduleRestockAlert(
                                 id: e.id.hashCode.abs(),
                                 itemName: e.itemName,
                                 daysRemaining: newDays,
                               );
                             }
+                            // If newDays > 7, old notification is cancelled above
+                            // and no new one is scheduled — stock is sufficient.
                           }
                         },
                       ),
