@@ -1,4 +1,4 @@
-package com.example.nutriequine_app
+package com.equineedge.app
 
 import io.flutter.embedding.android.FlutterActivity
 

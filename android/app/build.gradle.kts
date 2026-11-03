@@ -14,7 +14,7 @@ if (keyPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.nutriequine_app"
+    namespace = "com.equineedge.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -34,7 +34,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.nutriequine_app"
+        applicationId = "com.equineedge.app"
         minSdk = 26  // Raised from flutter.minSdkVersion (was 21/24) — MobSF fix: drop vulnerable Android 7.x
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
