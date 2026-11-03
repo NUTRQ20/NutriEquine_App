@@ -418,19 +418,25 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           if (e.daysRemaining != null &&
                               e.daysRemaining! > 0) {
                             // Decrement by 1 (user confirmed feed was given)
-                            final newDays =
-                                e.daysRemaining! - 1;
+                            final newDays = e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
                                 e.id, e.daysRemaining!);
-                            // Schedule low-stock alert if needed
+
+                            // Always cancel the old restock notification first
+                            // so the stale day count is never shown.
+                            await NotificationService().cancelNotification(
+                                10000 + e.id.hashCode.abs());
+
+                            // Reschedule with the NEW count if still low stock
                             if (newDays <= 7) {
-                              await NotificationService()
-                                  .scheduleRestockAlert(
+                              await NotificationService().scheduleRestockAlert(
                                 id: e.id.hashCode.abs(),
                                 itemName: e.itemName,
                                 daysRemaining: newDays,
                               );
                             }
+                            // If newDays > 7, old notification is cancelled above
+                            // and no new one is scheduled — stock is sufficient.
                           }
                         },
                       ),
