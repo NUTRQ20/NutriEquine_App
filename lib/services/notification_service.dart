@@ -598,40 +598,70 @@ class FeedAutoUpdateService {
 
       final notifService = NotificationService();
 
-      // First pass: cancel ALL existing restock notifications
-      // so no stale day counts remain from previous app opens.
-      for (final doc in snap.docs) {
-        await notifService.cancelNotification(
-            10000 + doc.id.hashCode.abs());
-      }
+      // Cache horse names so we only fetch each horse once
+      final Map<String, String> horseNameCache = {};
 
-      // Second pass: schedule fresh notifications with current counts
       for (final doc in snap.docs) {
         final data = doc.data();
+        final safeId = doc.id.hashCode.abs();
         final daysRemaining = data['daysRemaining'] as int?;
         final itemName = data['itemName'] as String? ?? 'Supplement';
         final timeOfDay = data['timeOfDay'] as String? ?? 'AM';
-        final horseId = data['horseId'] as String? ?? '';
+        final storedHorseName = data['horseName'] as String?;
+        final horseId = data['horseId'] as String?;
 
-        // Schedule daily feeding time reminder (AM/Midday/PM)
-        // Fires every day at the user's chosen time slot.
-        // horseName stored in feed entry; falls back to itemName if not present.
-        final horseName = data['horseName'] as String? ?? itemName;
+        // Resolve horse name:
+        // 1. Use stored horseName if it's set and not a placeholder
+        // 2. Otherwise look up the horse document by horseId
+        // 3. Final fallback: item name
+        String horseName;
+        final isPlaceholder = storedHorseName == null ||
+            storedHorseName.isEmpty ||
+            storedHorseName == 'Your horse';
+
+        if (!isPlaceholder) {
+          horseName = storedHorseName!;
+        } else if (horseId != null && horseId.isNotEmpty) {
+          if (horseNameCache.containsKey(horseId)) {
+            horseName = horseNameCache[horseId]!;
+          } else {
+            try {
+              final horseDoc =
+                  await _db.collection('horses').doc(horseId).get();
+              final name = horseDoc.data()?['name'] as String?;
+              horseName = (name != null && name.isNotEmpty) ? name : itemName;
+              horseNameCache[horseId] = horseName;
+              // Also patch the feed entry so future reads don't need a lookup
+              await doc.reference.update({'horseName': horseName});
+            } catch (_) {
+              horseName = itemName;
+            }
+          }
+        } else {
+          horseName = itemName;
+        }
+
+        // ── Feeding time (daily repeat at AM/Midday/PM) ──────────────
+        // Cancel first so we don't stack duplicates on repeated app opens.
+        // matchDateTimeComponents: time in scheduleFeedingTimeReminder
+        // means it repeats daily — one schedule is enough.
+        await notifService.cancelFeedingTimeReminder(safeId);
         await notifService.scheduleFeedingTimeReminder(
-          id: doc.id.hashCode.abs(),
+          id: safeId,
           horseName: horseName,
           itemName: itemName,
           timeOfDay: timeOfDay,
         );
 
-        // Skip restock if no inventory tracking
-        if (daysRemaining == null) continue;
+        // ── Restock alert (only when low stock) ──────────────────────
+        // Always cancel first so the count shown is always the CURRENT
+        // daysRemaining from Firestore — never a stale queued value.
+        await notifService.cancelNotification(10000 + safeId);
 
-        // Only notify restock if stock is low
+        if (daysRemaining == null) continue;
         if (daysRemaining <= 7) {
-          // Schedule alert for tomorrow 8 AM with CURRENT day count
           await notifService.scheduleRestockAlert(
-            id: doc.id.hashCode.abs(),
+            id: safeId,
             itemName: itemName,
             daysRemaining: daysRemaining,
           );
