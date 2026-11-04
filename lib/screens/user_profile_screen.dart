@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,12 +12,10 @@ class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
 
   @override
-  State<UserProfileScreen> createState() =>
-      _UserProfileScreenState();
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState
-    extends State<UserProfileScreen> {
+class _UserProfileScreenState extends State<UserProfileScreen> {
   Map<String, dynamic> _profile = {};
   bool _loading = true;
   bool _editing = false;
@@ -155,8 +154,7 @@ class _UserProfileScreenState
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Sign out?'),
-        content: const Text(
-            'You will be returned to the login screen.'),
+        content: const Text('You will be returned to the login screen.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -182,16 +180,15 @@ class _UserProfileScreenState
   }
 
   Future<void> _deleteAccount() async {
-    // Step 1: confirm intent
+    // Step 1: Confirm intent
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete account?'),
+        title: const Text('Delete Account?'),
         content: const Text(
-          'Are you sure you want to permanently delete '
-          'your account and all your data including all '
-          'horses and their records? '
-          'This cannot be undone.',
+          'Are you sure you want to permanently delete your account? '
+          'All your personal information, profile details, and associated '
+          'data will be permanently deleted. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -199,10 +196,9 @@ class _UserProfileScreenState
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Yes, delete my account'),
+            child: const Text('Delete Account'),
           ),
         ],
       ),
@@ -220,8 +216,7 @@ class _UserProfileScreenState
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 16),
-              Expanded(
-                  child: Text('Deleting account and all data...')),
+              Expanded(child: Text('Deleting account and all data...')),
             ],
           ),
         ),
@@ -233,65 +228,83 @@ class _UserProfileScreenState
       final uid = user.uid;
       final fs = context.read<FirestoreService>();
 
-      // Step 1: Delete all horses and their related data
-      // This calls deleteHorse() for each horse, which handles
-      // feed_entries, wellness_logs, care_reminders,
-      // training_logs, and barn_tasks for each horse.
+      // Step 2: Delete all Firestore data first
       await fs.deleteAllHorsesForUser(uid);
-
-      // Step 2: Delete the user profile document
       await fs.deleteUserProfile(uid);
 
-      // Step 3: Delete Firebase Auth account
-      await user.delete();
+      // Step 3: Try to delete the Firebase Auth account.
+      // Firebase requires a recent sign-in for account deletion.
+      // If the session is stale, re-authenticate silently via Google,
+      // then retry — no manual action needed from the user.
+      await _deleteFirebaseUser(user);
 
-      // Step 4: Clear local preferences
+      // Step 4: Clear all local session data
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Step 5: Navigate to login
+      // Clear Google and Facebook sessions via AuthService
       if (mounted) {
-        // Close loading dialog first
-        Navigator.of(context).pop();
+        await context.read<AuthService>().signOut();
+      }
+
+      // Step 5: Navigate to login screen
+      if (mounted) {
+        Navigator.of(context).pop(); // close loading dialog
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
           (_) => false,
         );
       }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) Navigator.of(context).pop(); // close loading
-      if (e.code == 'requires-recent-login') {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Please sign out and sign back in, '
-                'then try deleting again.',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${e.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
     } catch (e) {
-      if (mounted) Navigator.of(context).pop(); // close loading
+      if (mounted) Navigator.of(context).pop(); // close loading dialog
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Error deleting account: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    }
+  }
+
+  /// Deletes the Firebase Auth account.
+  /// If Firebase requires recent authentication (session is stale),
+  /// silently re-authenticates via Google and retries automatically.
+  /// The user never sees a manual sign-out prompt.
+  Future<void> _deleteFirebaseUser(User user) async {
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'requires-recent-login') rethrow;
+
+      // Session is stale — re-authenticate silently via Google,
+      // then retry the deletion without bothering the user.
+      final googleSignIn = GoogleSignIn();
+
+      // Try silent sign-in first (no UI if the user is already signed in)
+      GoogleSignInAccount? googleUser = await googleSignIn.signInSilently();
+
+      // Silent sign-in can return null on some devices — fall back to
+      // interactive sign-in (shows account picker once, automatically).
+      googleUser ??= await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled the re-auth picker
+        throw Exception('Re-authentication cancelled. Please try again.');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Re-authenticate with Firebase using the fresh Google credential
+      await user.reauthenticateWithCredential(credential);
+
+      // Now retry the deletion — session is fresh
+      await user.delete();
     }
   }
 
@@ -302,8 +315,7 @@ class _UserProfileScreenState
 
     String? memberSince;
     if (user.metadata.creationTime != null) {
-      memberSince =
-          DateFormat.yMMMd().format(user.metadata.creationTime!);
+      memberSince = DateFormat.yMMMd().format(user.metadata.creationTime!);
     }
 
     return Scaffold(
@@ -336,8 +348,8 @@ class _UserProfileScreenState
                       children: [
                         CircleAvatar(
                           radius: 44,
-                          backgroundColor: const Color(0xFF2F5233)
-                              .withValues(alpha: 0.15),
+                          backgroundColor:
+                              const Color(0xFF2F5233).withValues(alpha: 0.15),
                           child: Text(
                             (_profile['fullName']?.isNotEmpty == true
                                     ? _profile['fullName']!
@@ -351,7 +363,6 @@ class _UserProfileScreenState
                           ),
                         ),
                         const SizedBox(height: 16),
-
                         if (!_editing) ...[
                           Text(
                             _profile['fullName'] ?? 'No name set',
@@ -362,38 +373,34 @@ class _UserProfileScreenState
                           ),
                           const SizedBox(height: 4),
                           Text(user.email ?? '',
-                              style:
-                                  const TextStyle(color: Colors.grey)),
+                              style: const TextStyle(color: Colors.grey)),
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _roleColor(
-                                      _profile['role'] ?? 'Owner')
+                              color: _roleColor(_profile['role'] ?? 'Owner')
                                   .withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: _roleColor(
-                                    _profile['role'] ?? 'Owner'),
+                                color: _roleColor(_profile['role'] ?? 'Owner'),
                               ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _roleIcon(
-                                      _profile['role'] ?? 'Owner'),
+                                  _roleIcon(_profile['role'] ?? 'Owner'),
                                   size: 16,
-                                  color: _roleColor(
-                                      _profile['role'] ?? 'Owner'),
+                                  color:
+                                      _roleColor(_profile['role'] ?? 'Owner'),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   _profile['role'] ?? 'Owner',
                                   style: TextStyle(
-                                    color: _roleColor(
-                                        _profile['role'] ?? 'Owner'),
+                                    color:
+                                        _roleColor(_profile['role'] ?? 'Owner'),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -411,8 +418,7 @@ class _UserProfileScreenState
                         ] else ...[
                           TextField(
                             controller: _nameCtrl,
-                            textCapitalization:
-                                TextCapitalization.words,
+                            textCapitalization: TextCapitalization.words,
                             decoration: const InputDecoration(
                               labelText: 'Full name',
                               border: OutlineInputBorder(),
@@ -442,7 +448,6 @@ class _UserProfileScreenState
                           ),
                         ),
                         const Divider(height: 20),
-
                         if (!_editing) ...[
                           _InfoRow(
                             icon: Icons.email_outlined,
@@ -457,8 +462,7 @@ class _UserProfileScreenState
                           _InfoRow(
                             icon: Icons.phone,
                             label: 'Mobile',
-                            value: _profile['mobile']?.isNotEmpty ==
-                                    true
+                            value: _profile['mobile']?.isNotEmpty == true
                                 ? _profile['mobile']
                                 : '--',
                           ),
@@ -473,15 +477,13 @@ class _UserProfileScreenState
                             decoration: const InputDecoration(
                               labelText: 'Role',
                               border: OutlineInputBorder(),
-                              prefixIcon:
-                                  Icon(Icons.work_outline),
+                              prefixIcon: Icon(Icons.work_outline),
                             ),
                             items: _roles
-                                .map((r) => DropdownMenuItem(
-                                    value: r, child: Text(r)))
+                                .map((r) =>
+                                    DropdownMenuItem(value: r, child: Text(r)))
                                 .toList(),
-                            onChanged: (v) =>
-                                setState(() => _role = v!),
+                            onChanged: (v) => setState(() => _role = v!),
                           ),
                           const SizedBox(height: 12),
                           TextField(
@@ -499,28 +501,24 @@ class _UserProfileScreenState
                             decoration: const InputDecoration(
                               labelText: 'Gender',
                               border: OutlineInputBorder(),
-                              prefixIcon:
-                                  Icon(Icons.person_outline),
+                              prefixIcon: Icon(Icons.person_outline),
                             ),
                             items: _genders
-                                .map((g) => DropdownMenuItem(
-                                    value: g, child: Text(g)))
+                                .map((g) =>
+                                    DropdownMenuItem(value: g, child: Text(g)))
                                 .toList(),
-                            onChanged: (v) =>
-                                setState(() => _gender = v!),
+                            onChanged: (v) => setState(() => _gender = v!),
                           ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed:
-                                  _saving ? null : _saveProfile,
+                              onPressed: _saving ? null : _saveProfile,
                               child: _saving
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
-                                      child:
-                                          CircularProgressIndicator(
+                                      child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         color: Colors.white,
                                       ),
@@ -556,8 +554,7 @@ class _UserProfileScreenState
                       color: Colors.orange,
                     ),
                     title: const Text('Sign out'),
-                    subtitle:
-                        const Text('Sign out of your account'),
+                    subtitle: const Text('Sign out of your account'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _signOut,
                   ),
@@ -593,8 +590,7 @@ class _UserProfileScreenState
                 const Center(
                   child: Text(
                     'EquineEdge v1.0.0',
-                    style:
-                        TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -627,8 +623,7 @@ class _InfoRow extends StatelessWidget {
             width: 80,
             child: Text(
               label,
-              style:
-                  const TextStyle(color: Colors.grey, fontSize: 13),
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
           ),
           Expanded(
