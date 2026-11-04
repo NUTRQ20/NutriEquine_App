@@ -103,7 +103,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             title: '6. Contact Us',
             content:
                 'For privacy-related questions or data deletion requests, '
-                'contact us at:\n\ninfo@equineedge.com\nequineedge.com',
+                'contact us at:\n\ncontact@nutriequine.com\nnutriequine.com',
           ),
 
           const SizedBox(height: 16),
@@ -111,18 +111,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
           // Links
           OutlinedButton.icon(
             onPressed: () =>
-                _openUrl(context, 'https://equineedge.com'),
+                _openUrl(context, 'https://nutriequine.com/'),
             icon: const Icon(Icons.open_in_browser),
-            label: const Text('Visit equineedge.com'),
+            label: const Text('Visit nutriequine.com'),
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () =>
-                _openUrl(context, 'https://policies.google.com/privacy'),
-            icon: const Icon(Icons.open_in_browser),
-            label: const Text('Google / Firebase Privacy Policy'),
-          ),
-          const SizedBox(height: 24),
         ],
       ),
     );

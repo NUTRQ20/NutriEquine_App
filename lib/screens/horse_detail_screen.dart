@@ -7,7 +7,6 @@ import '../models/care_models.dart';
 import '../models/training_log.dart';
 import '../models/barn_task.dart';
 import '../services/firestore_service.dart';
-import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import 'analytics_screen.dart';
 import 'shared_access_screen.dart';
@@ -77,66 +76,29 @@ class _ProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fs = context.read<FirestoreService>();
-    final storage = context.read<StorageService>();
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Center(
-          child: Stack(
-            children: [
-              CircleAvatar(
-                radius: 56,
-                backgroundColor:
-                    const Color(0xFF2F5233).withOpacity(0.15),
-                backgroundImage: horse.photoUrl != null
-                    ? NetworkImage(horse.photoUrl!)
-                    : null,
-                child: horse.photoUrl == null
-                    ? Text(
-                        horse.name.isNotEmpty
-                            ? horse.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2F5233)),
-                      )
-                    : null,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: FloatingActionButton.small(
-                  heroTag: 'photo_fab_${horse.id}',
-                  onPressed: () async {
-                    try {
-                      final url =
-                          await storage.pickAndUploadHorsePhoto(horse.id);
-                      if (url != null) {
-                        await fs.updateHorsePhoto(horse.id, url);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Photo updated!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Error uploading photo: $e')),
-                        );
-                      }
-                    }
-                  },
-                  child: const Icon(Icons.camera_alt, size: 18),
-                ),
-              ),
-            ],
+          child: CircleAvatar(
+            radius: 56,
+            backgroundColor:
+                const Color(0xFF2F5233).withOpacity(0.15),
+            backgroundImage: horse.photoUrl != null
+                ? NetworkImage(horse.photoUrl!)
+                : null,
+            child: horse.photoUrl == null
+                ? Text(
+                    horse.name.isNotEmpty
+                        ? horse.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2F5233)),
+                  )
+                : null,
           ),
         ),
         const SizedBox(height: 20),
@@ -295,12 +257,15 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                     daysOfSupply: days,
                     daysRemaining: days,
                   );
+                  // Capture navigator before async gaps so the sheet
+                  // closes reliably even if the stream triggers a rebuild
+                  final nav = Navigator.of(ctx);
                   await fs.addFeedEntry(entry);
                   // Store horseName in the feed entry document
                   // so runDailyCheck can use it for feeding time notifications
                   await fs.updateFeedEntryHorseName(
                       entry.id, widget.horse.name);
-                  if (ctx.mounted) Navigator.pop(ctx);
+                  nav.pop();
                 },
                 child: const Text('Save'),
               ),

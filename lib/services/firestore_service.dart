@@ -214,7 +214,21 @@ class FirestoreService {
 
   Future<void> saveUserProfile(Map<String, dynamic> data) async {
     if (uid.isEmpty) return;
-    await _users.doc(uid).set(data, SetOptions(merge: true));
+    // Always write to users/{uid} — SetOptions(merge:true) means this is a
+    // safe upsert: it creates the doc if missing, or updates only the supplied
+    // fields if the doc already exists. It NEVER creates a second document.
+    //
+    // Guard: if the doc already has createdAt, don't overwrite it.
+    // This ensures the original signup timestamp is preserved when the user
+    // comes back later to fill their profile after skipping.
+    final existing = await _users.doc(uid).get();
+    final toWrite = Map<String, dynamic>.from(data);
+    if (existing.exists &&
+        existing.data()!.containsKey('createdAt') &&
+        toWrite.containsKey('createdAt')) {
+      toWrite.remove('createdAt'); // preserve the original signup timestamp
+    }
+    await _users.doc(uid).set(toWrite, SetOptions(merge: true));
   }
 
   Future<Map<String, dynamic>?> getUserProfile() async {

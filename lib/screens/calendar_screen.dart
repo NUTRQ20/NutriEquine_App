@@ -92,7 +92,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         events.add(CalendarEvent(
           title: title,
           type: 'barn_task',
-          color: Colors.teal,
+          color: Colors.cyan,
           icon: Icons.checklist,
           isComplete: b.isComplete,
         ));
@@ -101,17 +101,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return events;
   }
 
-  Color _reminderColor(String cat) {
-    switch (cat) {
-      case 'Vet': return Colors.blue;
-      case 'Farrier': return Colors.green;
-      case 'Dental': return Colors.deepPurple;
-      case 'Deworm': return Colors.orange;
-      case 'Vaccine': return Colors.teal;
-      case 'Supplement Refill': return Colors.red;
-      default: return Colors.grey;
-    }
-  }
+  Color _reminderColor(String cat) => Colors.blue;
 
   IconData _reminderIcon(String cat) {
     switch (cat) {
@@ -343,12 +333,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           horizontal: 12, vertical: 6),
                       child: Row(
                         children: [
-                          _LegendChip(
-                              'Reminders', Colors.blue),
-                          _LegendChip(
-                              'Training', Colors.purple),
-                          _LegendChip(
-                              'Barn Tasks', Colors.teal),
+                          _LegendChip('Reminders', Colors.blue),
+                          _LegendChip('Training', Colors.purple),
+                          _LegendChip('Barn Tasks', Colors.cyan),
                         ],
                       ),
                     ),
