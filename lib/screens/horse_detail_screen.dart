@@ -257,8 +257,6 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                     daysOfSupply: days,
                     daysRemaining: days,
                   );
-                  // Capture navigator before async gaps so the sheet
-                  // closes reliably even if the stream triggers a rebuild
                   final nav = Navigator.of(ctx);
                   await fs.addFeedEntry(entry);
                   // Store horseName in the feed entry document
@@ -878,7 +876,7 @@ class _RemindersTab extends StatelessWidget {
     // Default: 7 days from now at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day + 7,
+      now.year, now.month, now.day,
       now.hour, now.minute,
     );
     // The time component is tracked separately for display
@@ -965,6 +963,7 @@ class _RemindersTab extends StatelessWidget {
                   final picked = await showTimePicker(
                     context: ctx,
                     initialTime: dueTime,
+                    initialEntryMode: TimePickerEntryMode.dial,
                   );
                   if (picked != null) {
                     setState(() {
@@ -1201,6 +1200,7 @@ class _BarnTasksTab extends StatelessWidget {
                   final picked = await showTimePicker(
                     context: ctx,
                     initialTime: dueTime,
+                    initialEntryMode: TimePickerEntryMode.dial,
                   );
                   if (picked != null) {
                     setState(() {
