@@ -4,26 +4,26 @@ import 'notification_service.dart';
 
 /// Feed Auto Update Service
 ///
-/// Runs every time the app opens (called from home_screen.dart initState).
+/// Called from splash_screen.dart when user is confirmed logged in.
 ///
-/// KEY CHANGE from old version:
-///   Old: showInstantNotification()  → only works when app is open
-///   New: scheduleRestockAlert()     → schedules tomorrow 8 AM → works in background
-///        scheduleFeedingTimeReminder() → schedules at 7/12/18h → works in background
+/// Once notifications are scheduled via zonedSchedule(), Android AlarmManager
+/// fires them at the set time even if the app is completely closed/killed.
+/// The app does NOT need to be open for notifications to fire.
 ///
-/// This means even if the user opens the app once and closes it:
-///   - The OS AlarmManager will fire the notifications at the right time
-///   - Works even when app is completely closed / killed
+/// Background delivery:
+///   scheduleRestockAlert()         → fires at 8 AM (today if not passed, else tomorrow)
+///   scheduleFeedingTimeReminder()  → fires daily at 7 AM / 12 PM / 6 PM
 class FeedAutoUpdateService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  /// Call this every time the app opens.
+  /// Call this on app open (from splash_screen.dart after auth confirmed).
   ///
-  /// 1. Auto-decrements daysRemaining for missed days.
-  /// 2. Schedules restock alert (tomorrow 8 AM) if low stock.
-  /// 3. Schedules feeding time reminders for today (7 AM / 12 PM / 6 PM).
+  /// 1. Schedules restock alert at 8 AM for any feed entry with stock ≤ 7 days.
+  /// 2. Schedules daily feeding time reminders for each feed entry.
+  ///
+  /// Never modifies Firestore. Only reads and schedules notifications.
   Future<void> runDailyCheck() async {
     if (_uid.isEmpty) return;
 
@@ -33,84 +33,74 @@ class FeedAutoUpdateService {
           .where('ownerId', isEqualTo: _uid)
           .get();
 
-      final today = _normalizeDate(DateTime.now());
       final notifService = NotificationService();
+      await notifService.init(); // ensure plugin is ready before scheduling
+
+      // Cache horse names to avoid repeated Firestore reads for same horse
+      final Map<String, String> horseNameCache = {};
 
       for (final doc in snap.docs) {
         final data = doc.data();
-        final daysRemaining = data['daysRemaining'] as int?;
+        final daysRemaining = (data['daysRemaining'] as num?)?.toInt();
         final itemName = data['itemName'] as String? ?? 'Supplement';
         final timeOfDay = data['timeOfDay'] as String? ?? 'AM';
         final horseId = data['horseId'] as String? ?? '';
+        final storedHorseName = data['horseName'] as String?;
 
-        // ── Step 1: Schedule feeding time reminder (works in background) ──
-        // This is separate from restock — it's a daily feeding alarm
-        if (horseId.isNotEmpty) {
-          await notifService.scheduleFeedingTimeReminder(
-            id: doc.id.hashCode.abs() % 9000,
-            horseName: data['horseName'] as String? ?? 'Your horse',
-            itemName: itemName,
-            timeOfDay: timeOfDay,
-          );
-        }
+        final safeId = doc.id.hashCode.abs();
 
-        // ── Step 2: Restock check (only if inventory tracking enabled) ──
-        if (daysRemaining == null) continue;
+        // ── Resolve horse name ────────────────────────────────────────
+        // 1. Use stored horseName if it's real (not empty / placeholder)
+        // 2. Otherwise look up the horse document by horseId
+        // 3. Fallback: item name
+        String horseName;
+        final isPlaceholder = storedHorseName == null ||
+            storedHorseName.isEmpty ||
+            storedHorseName == 'Your horse';
 
-        // If already out of stock, schedule restock alert but skip decrement
-        if (daysRemaining <= 0) {
-          await notifService.scheduleRestockAlert(
-            id: doc.id.hashCode.abs() % 9000,
-            itemName: itemName,
-            daysRemaining: 0,
-          );
-          continue;
-        }
-
-        final lastGivenAt = data['lastGivenAt'] as int?;
-        int daysMissed = 0;
-
-        if (lastGivenAt == null) {
-          final createdAt = data['createdAt'] as int?;
-          if (createdAt != null) {
-            final createdDate = _normalizeDate(
-              DateTime.fromMillisecondsSinceEpoch(createdAt),
-            );
-            daysMissed = today.difference(createdDate).inDays;
+        if (!isPlaceholder) {
+          horseName = storedHorseName!;
+        } else if (horseId.isNotEmpty) {
+          if (horseNameCache.containsKey(horseId)) {
+            horseName = horseNameCache[horseId]!;
+          } else {
+            try {
+              final horseDoc =
+                  await _db.collection('horses').doc(horseId).get();
+              final name = horseDoc.data()?['name'] as String?;
+              horseName =
+                  (name != null && name.isNotEmpty) ? name : itemName;
+              horseNameCache[horseId] = horseName;
+              // Patch the feed entry so future reads skip this lookup
+              await doc.reference.update({'horseName': horseName});
+            } catch (_) {
+              horseName = itemName;
+            }
           }
         } else {
-          final lastDate = _normalizeDate(
-            DateTime.fromMillisecondsSinceEpoch(lastGivenAt),
-          );
-          daysMissed = today.difference(lastDate).inDays;
-          // Already given today — skip decrement, but still check low stock
-          if (daysMissed == 0) {
-            if (daysRemaining <= 7) {
-              await notifService.scheduleRestockAlert(
-                id: doc.id.hashCode.abs() % 9000,
-                itemName: itemName,
-                daysRemaining: daysRemaining,
-              );
-            }
-            continue;
-          }
+          horseName = itemName;
         }
 
-        if (daysMissed <= 0) continue;
+        // ── Step 1: Schedule daily feeding time reminder ──────────────
+        await notifService.scheduleFeedingTimeReminder(
+          id: safeId,
+          horseName: horseName,
+          itemName: itemName,
+          timeOfDay: timeOfDay,
+        );
 
-        // Calculate new days remaining after missed days
-        final newDaysRemaining =
-            (daysRemaining - daysMissed).clamp(0, daysRemaining);
+        // ── Step 2: Restock alert if low stock ────────────────────────
+        if (daysRemaining == null) continue;
 
-        // Update Firestore
-        await doc.reference.update({'daysRemaining': newDaysRemaining});
+        // Cancel stale alert first so count shown is always current
+        await notifService.cancelNotification(10000 + safeId);
 
-        // Schedule restock alert if low stock (fires tomorrow 8 AM in background)
-        if (newDaysRemaining <= 7) {
+        if (daysRemaining <= 7) {
           await notifService.scheduleRestockAlert(
-            id: doc.id.hashCode.abs() % 9000,
+            id: safeId,
+            horseName: horseName,
             itemName: itemName,
-            daysRemaining: newDaysRemaining,
+            daysRemaining: daysRemaining,
           );
         }
       }
@@ -120,28 +110,22 @@ class FeedAutoUpdateService {
   }
 
   /// Called when user TICKS a feed item (marks as given today).
-  ///
-  /// OLD: showInstantNotification() — only worked when app was open.
-  /// NEW: scheduleRestockAlert() at tomorrow 8 AM — works in background.
   Future<void> onFeedItemTicked({
     required String docId,
     required String itemName,
     required int newDaysRemaining,
   }) async {
     final notifService = NotificationService();
+    await notifService.init();
 
     if (newDaysRemaining <= 7) {
-      // Schedule restock alert for tomorrow 8 AM (fires even when app is closed)
       await notifService.scheduleRestockAlert(
-        id: docId.hashCode.abs() % 9000,
+        id: docId.hashCode.abs(),
         itemName: itemName,
         daysRemaining: newDaysRemaining,
       );
     } else {
-      // Cancel any existing restock alert — stock is now sufficient
-      await notifService.cancelNotification(10000 + docId.hashCode.abs() % 9000);
+      await notifService.cancelNotification(10000 + docId.hashCode.abs());
     }
   }
-
-  DateTime _normalizeDate(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 }

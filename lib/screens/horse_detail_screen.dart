@@ -83,16 +83,12 @@ class _ProfileTab extends StatelessWidget {
         Center(
           child: CircleAvatar(
             radius: 56,
-            backgroundColor:
-                const Color(0xFF2F5233).withOpacity(0.15),
-            backgroundImage: horse.photoUrl != null
-                ? NetworkImage(horse.photoUrl!)
-                : null,
+            backgroundColor: const Color(0xFF2F5233).withOpacity(0.15),
+            backgroundImage:
+                horse.photoUrl != null ? NetworkImage(horse.photoUrl!) : null,
             child: horse.photoUrl == null
                 ? Text(
-                    horse.name.isNotEmpty
-                        ? horse.name[0].toUpperCase()
-                        : '?',
+                    horse.name.isNotEmpty ? horse.name[0].toUpperCase() : '?',
                     style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
@@ -103,18 +99,16 @@ class _ProfileTab extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _InfoTile('Name', horse.name),
-        _InfoTile(
-            'Breed', horse.breed.isNotEmpty ? horse.breed : '--'),
+        _InfoTile('Breed', horse.breed.isNotEmpty ? horse.breed : '--'),
         _InfoTile('Discipline',
             horse.discipline.isNotEmpty ? horse.discipline : '--'),
-        _InfoTile('Age',
-            horse.ageYears != null ? '${horse.ageYears} years' : '--'),
-        _InfoTile('Weight',
-            horse.weightKg != null ? '${horse.weightKg} kg' : '--'),
+        _InfoTile(
+            'Age', horse.ageYears != null ? '${horse.ageYears} years' : '--'),
+        _InfoTile(
+            'Weight', horse.weightKg != null ? '${horse.weightKg} kg' : '--'),
         _InfoTile('Vet', horse.vetName ?? '--'),
         _InfoTile('Farrier', horse.farrierName ?? '--'),
-        if (horse.goals.isNotEmpty)
-          _InfoTile('Goals', horse.goals.join(', ')),
+        if (horse.goals.isNotEmpty) _InfoTile('Goals', horse.goals.join(', ')),
         if (horse.allergies.isNotEmpty)
           _InfoTile('Allergies', horse.allergies.join(', ')),
         const SizedBox(height: 24),
@@ -127,10 +121,9 @@ class _ProfileTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           onPressed: () => Navigator.push(
-           context,
-          MaterialPageRoute(
-          builder: (_) => SupplementProtocolScreen(
-          horse: horse)),
+            context,
+            MaterialPageRoute(
+                builder: (_) => SupplementProtocolScreen(horse: horse)),
           ),
         ),
         const SizedBox(height: 8),
@@ -161,8 +154,7 @@ class _InfoTile extends StatelessWidget {
             width: 100,
             child: Text(label,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey)),
+                    fontWeight: FontWeight.w600, color: Colors.grey)),
           ),
           Expanded(child: Text(value)),
         ],
@@ -194,83 +186,100 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+      builder: (ctx) {
+        final nav = Navigator.of(ctx); // captured before StatefulBuilder
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) => Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Add feed / supplement',
+                    style: Theme.of(ctx).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: itemCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Item name (e.g. EquineEdge GutCare)'),
+                ),
+                TextField(
+                  controller: dosageCtrl,
+                  decoration:
+                      const InputDecoration(labelText: 'Dosage (e.g. 1 scoop)'),
+                ),
+                TextField(
+                  controller: daysCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Days of supply (for inventory tracking)'),
+                ),
+                DropdownButtonFormField<String>(
+                  value: timeOfDay,
+                  items: ['AM', 'Midday', 'PM']
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
+                  onChanged: (v) => setSheetState(() => timeOfDay = v ?? 'AM'),
+                  decoration: const InputDecoration(labelText: 'Time of day'),
+                ),
+                SwitchListTile(
+                  value: isSupplement,
+                  onChanged: (v) => setSheetState(() => isSupplement = v),
+                  title: const Text('This is an EquineEdge supplement'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () async {
+                    if (itemCtrl.text.trim().isEmpty) return;
+
+                    final days = int.tryParse(daysCtrl.text.trim());
+
+                    final entry = FeedEntry(
+                      id: const Uuid().v4(),
+                      horseId: widget.horse.id,
+                      ownerId: fs.uid,
+                      itemName: itemCtrl.text.trim(),
+                      dosage: dosageCtrl.text.trim(),
+                      timeOfDay: timeOfDay,
+                      isSupplement: isSupplement,
+                      daysOfSupply: days,
+                      daysRemaining: days,
+                    );
+
+                    try {
+                      await fs.addFeedEntry(entry);
+
+                      await fs.updateFeedEntryHorseName(
+                          entry.id, widget.horse.name);
+
+                      // Schedule restock notification immediately if low stock
+                      if (days != null && days <= 7) {
+                        await NotificationService().scheduleRestockAlert(
+                          id: entry.id.hashCode.abs(),
+                          itemName: entry.itemName,
+                          daysRemaining: days,
+                          horseName: widget.horse.name,
+                        );
+                      }
+
+                      nav.pop();
+                    } catch (e) {
+                      debugPrint('Error saving feed entry: $e');
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Add feed / supplement',
-                  style: Theme.of(ctx).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              TextField(
-                controller: itemCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'Item name (e.g. EquineEdge GutCare)'),
-              ),
-              TextField(
-                controller: dosageCtrl,
-                decoration: const InputDecoration(
-                    labelText: 'Dosage (e.g. 1 scoop)'),
-              ),
-              TextField(
-                controller: daysCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: 'Days of supply (for inventory tracking)'),
-              ),
-              DropdownButtonFormField<String>(
-                value: timeOfDay,
-                items: ['AM', 'Midday', 'PM']
-                    .map((t) =>
-                        DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: (v) =>
-                    setSheetState(() => timeOfDay = v ?? 'AM'),
-                decoration:
-                    const InputDecoration(labelText: 'Time of day'),
-              ),
-              SwitchListTile(
-                value: isSupplement,
-                onChanged: (v) =>
-                    setSheetState(() => isSupplement = v),
-                title: const Text('This is an EquineEdge supplement'),
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  if (itemCtrl.text.trim().isEmpty) return;
-                  final days = int.tryParse(daysCtrl.text.trim());
-                  final entry = FeedEntry(
-                    id: const Uuid().v4(),
-                    horseId: widget.horse.id,
-                    ownerId: fs.uid,
-                    itemName: itemCtrl.text.trim(),
-                    dosage: dosageCtrl.text.trim(),
-                    timeOfDay: timeOfDay,
-                    isSupplement: isSupplement,
-                    daysOfSupply: days,
-                    daysRemaining: days,
-                  );
-                  final nav = Navigator.of(ctx);
-                  await fs.addFeedEntry(entry);
-                  // Store horseName in the feed entry document
-                  // so runDailyCheck can use it for feeding time notifications
-                  await fs.updateFeedEntryHorseName(
-                      entry.id, widget.horse.name);
-                  nav.pop();
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -298,65 +307,63 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
               return Card(
                 color: lowStock ? Colors.orange.shade50 : null,
                 child: ListTile(
-  leading: Icon(
-    e.isSupplement ? Icons.science : Icons.grass,
-    color: lowStock ? Colors.orange : null,
-    size: 20,
-  ),
-  title: Text(
-    e.itemName,
-    style: const TextStyle(
-      fontWeight: FontWeight.w600,
-      fontSize: 14,
-    ),
-  ),
-  subtitle: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const SizedBox(height: 2),
-      Text(
-        e.dosage,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 2),
-      Text(
-        justMarked
-            ? '${e.timeOfDay} · just given ✅'
-            : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
-        style: const TextStyle(fontSize: 12),
-      ),
-      if (e.daysRemaining != null) ...[
-        const SizedBox(height: 2),
-        Text(
-          '${e.daysRemaining} days remaining'
-          '${lowStock ? " · REORDER SOON" : ""}',
-          style: TextStyle(
-            fontSize: 12,
-            color: lowStock
-                ? Colors.orange.shade800
-                : Colors.grey,
-            fontWeight: lowStock
-                ? FontWeight.bold
-                : FontWeight.normal,
-          ),
-        ),
-      ],
-      if (e.daysOfSupply != null) ...[
-        const SizedBox(height: 2),
-        Text(
-          'Supply: ${e.daysOfSupply} days total',
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    ],
-  ),
-  isThreeLine: true,
+                  leading: Icon(
+                    e.isSupplement ? Icons.science : Icons.grass,
+                    color: lowStock ? Colors.orange : null,
+                    size: 20,
+                  ),
+                  title: Text(
+                    e.itemName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 2),
+                      Text(
+                        e.dosage,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        justMarked
+                            ? '${e.timeOfDay} · just given ✅'
+                            : '${e.timeOfDay}${e.lastGivenAt != null ? " · last given ${DateFormat.MMMd().add_jm().format(e.lastGivenAt!)}" : ""}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      if (e.daysRemaining != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${e.daysRemaining} days remaining'
+                          '${lowStock ? " · REORDER SOON" : ""}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                lowStock ? Colors.orange.shade800 : Colors.grey,
+                            fontWeight:
+                                lowStock ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                      if (e.daysOfSupply != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Supply: ${e.daysOfSupply} days total',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  isThreeLine: true,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -368,18 +375,14 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           justMarked
                               ? Icons.check_circle
                               : Icons.check_circle_outline,
-                          color: justMarked
-                              ? Colors.green
-                              : null,
+                          color: justMarked ? Colors.green : null,
                         ),
                         tooltip: 'Mark given (decrements stock by 1)',
                         onPressed: () async {
                           // Instant UI feedback
-                          setState(() =>
-                              _justMarked.add(e.id));
+                          setState(() => _justMarked.add(e.id));
                           await fs.markFeedGiven(e.id);
-                          if (e.daysRemaining != null &&
-                              e.daysRemaining! > 0) {
+                          if (e.daysRemaining != null && e.daysRemaining! > 0) {
                             // Decrement by 1 (user confirmed feed was given)
                             final newDays = e.daysRemaining! - 1;
                             await fs.decrementDaysRemaining(
@@ -396,6 +399,7 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                                 id: e.id.hashCode.abs(),
                                 itemName: e.itemName,
                                 daysRemaining: newDays,
+                                horseName: widget.horse.name,
                               );
                             }
                             // If newDays > 7, old notification is cancelled above
@@ -408,10 +412,8 @@ class _FeedPlanTabState extends State<_FeedPlanTab> {
                           icon: const Icon(Icons.refresh),
                           tooltip: 'Reset inventory',
                           onPressed: () {
-                            setState(() =>
-                                _justMarked.remove(e.id));
-                            fs.resetInventory(
-                                e.id, e.daysOfSupply!);
+                            setState(() => _justMarked.remove(e.id));
+                            fs.resetInventory(e.id, e.daysOfSupply!);
                           },
                         ),
                       IconButton(
@@ -474,7 +476,9 @@ class _WellnessTab extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
+            left: 16,
+            right: 16,
+            top: 16,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
           child: SingleChildScrollView(
@@ -488,24 +492,18 @@ class _WellnessTab extends StatelessWidget {
                 DropdownButtonFormField<String>(
                   value: appetite,
                   items: ['Good', 'Reduced', 'None']
-                      .map((t) => DropdownMenuItem(
-                          value: t, child: Text(t)))
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => appetite = v ?? 'Good'),
-                  decoration:
-                      const InputDecoration(labelText: 'Appetite'),
+                  onChanged: (v) => setState(() => appetite = v ?? 'Good'),
+                  decoration: const InputDecoration(labelText: 'Appetite'),
                 ),
                 DropdownButtonFormField<String>(
                   value: manure,
                   items: ['Normal', 'Loose', 'Hard', 'Mucus', 'Other']
-                      .map((t) => DropdownMenuItem(
-                          value: t, child: Text(t)))
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => manure = v ?? 'Normal'),
-                  decoration:
-                      const InputDecoration(labelText: 'Manure'),
+                  onChanged: (v) => setState(() => manure = v ?? 'Normal'),
+                  decoration: const InputDecoration(labelText: 'Manure'),
                 ),
                 Text('Body condition score: ${bcs.round()} / 9'),
                 Slider(
@@ -517,8 +515,7 @@ class _WellnessTab extends StatelessWidget {
                   onChanged: (v) => setState(() => bcs = v),
                 ),
                 const Text('Observed symptoms:',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 Wrap(
                   spacing: 8,
                   children: _symptoms
@@ -533,19 +530,17 @@ class _WellnessTab extends StatelessWidget {
                 ),
                 TextField(
                   controller: notesCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Behavior notes'),
+                  decoration:
+                      const InputDecoration(labelText: 'Behavior notes'),
                 ),
                 TextField(
                   controller: envCtrl,
                   decoration: const InputDecoration(
-                      labelText:
-                          'Environment / diet changes today'),
+                      labelText: 'Environment / diet changes today'),
                 ),
                 TextField(
                   controller: actionCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Action taken'),
+                  decoration: const InputDecoration(labelText: 'Action taken'),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -561,22 +556,20 @@ class _WellnessTab extends StatelessWidget {
                       appetite: appetite,
                       manure: manure,
                       bodyConditionScore: bcs.round(),
-                      behaviorNotes:
-                          notesCtrl.text.trim().isEmpty
-                              ? null
-                              : notesCtrl.text.trim(),
-                      environmentNotes:
-                          envCtrl.text.trim().isEmpty
-                              ? null
-                              : envCtrl.text.trim(),
+                      behaviorNotes: notesCtrl.text.trim().isEmpty
+                          ? null
+                          : notesCtrl.text.trim(),
+                      environmentNotes: envCtrl.text.trim().isEmpty
+                          ? null
+                          : envCtrl.text.trim(),
                       symptoms: selectedSymptoms.toList(),
                       flaggedForVet: flagged,
                       actionTaken: actionCtrl.text.trim(),
                     ));
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (flagged && context.mounted) {
-                      _showActionGuidance(context, appetite,
-                          manure, selectedSymptoms.toList());
+                      _showActionGuidance(
+                          context, appetite, manure, selectedSymptoms.toList());
                     }
                   },
                   child: const Text('Save check-in'),
@@ -589,8 +582,8 @@ class _WellnessTab extends StatelessWidget {
     );
   }
 
-  void _showActionGuidance(BuildContext context, String appetite,
-      String manure, List<String> symptoms) {
+  void _showActionGuidance(BuildContext context, String appetite, String manure,
+      List<String> symptoms) {
     final List<String> steps = [
       'Monitor every 2 hours for the next 12 hours.',
       'Check water intake - dehydration worsens many conditions.',
@@ -605,10 +598,9 @@ class _WellnessTab extends StatelessWidget {
       steps.add(
           'Loose manure with no other symptoms - monitor for 24 hours. If persisting, call vet.');
     }
-    if (symptoms.contains('Pawing') ||
-        symptoms.contains('Looking at flank')) {
-      steps.insert(0,
-          'Possible colic signs observed - contact your vet immediately.');
+    if (symptoms.contains('Pawing') || symptoms.contains('Looking at flank')) {
+      steps.insert(
+          0, 'Possible colic signs observed - contact your vet immediately.');
     }
     showDialog(
       context: context,
@@ -618,8 +610,7 @@ class _WellnessTab extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-                'These flags were logged. Recommended next steps:',
+            const Text('These flags were logged. Recommended next steps:',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             ...steps.map((s) => Padding(
@@ -635,8 +626,7 @@ class _WellnessTab extends StatelessWidget {
             const Divider(),
             const Text(
                 'This guidance is informational only and does not replace veterinary diagnosis.',
-                style:
-                    TextStyle(fontSize: 12, color: Colors.grey)),
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         actions: [
@@ -657,33 +647,26 @@ class _WellnessTab extends StatelessWidget {
         builder: (context, snapshot) {
           final logs = snapshot.data ?? [];
           if (logs.isEmpty) {
-            return const Center(
-                child: Text('No wellness logs yet.'));
+            return const Center(child: Text('No wellness logs yet.'));
           }
           return ListView(
             children: logs.map((l) {
               return Card(
-                color: l.flaggedForVet
-                    ? Colors.orange.shade50
-                    : null,
+                color: l.flaggedForVet ? Colors.orange.shade50 : null,
                 child: ListTile(
                   leading: Icon(
                     l.flaggedForVet
                         ? Icons.warning_amber
                         : Icons.check_circle_outline,
-                    color: l.flaggedForVet
-                        ? Colors.orange
-                        : Colors.green,
+                    color: l.flaggedForVet ? Colors.orange : Colors.green,
                   ),
-                  title: Text(
-                      DateFormat.yMMMd().add_jm().format(l.date)),
+                  title: Text(DateFormat.yMMMd().add_jm().format(l.date)),
                   subtitle: Text(
                     'Appetite: ${l.appetite} - Manure: ${l.manure} - BCS: ${l.bodyConditionScore}/9'
                     '${l.symptoms.isNotEmpty ? "\nSymptoms: ${l.symptoms.join(", ")}" : ""}'
                     '${l.behaviorNotes != null ? "\n${l.behaviorNotes}" : ""}',
                   ),
-                  isThreeLine: l.symptoms.isNotEmpty ||
-                      l.behaviorNotes != null,
+                  isThreeLine: l.symptoms.isNotEmpty || l.behaviorNotes != null,
                 ),
               );
             }).toList(),
@@ -718,7 +701,9 @@ class _TrainingTab extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
+            left: 16,
+            right: 16,
+            top: 16,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
           child: SingleChildScrollView(
@@ -732,33 +717,26 @@ class _TrainingTab extends StatelessWidget {
                 DropdownButtonFormField<String>(
                   value: type,
                   items: TrainingLog.types
-                      .map((t) => DropdownMenuItem(
-                          value: t, child: Text(t)))
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => type = v ?? 'Flatwork'),
-                  decoration: const InputDecoration(
-                      labelText: 'Session type'),
+                  onChanged: (v) => setState(() => type = v ?? 'Flatwork'),
+                  decoration: const InputDecoration(labelText: 'Session type'),
                 ),
                 DropdownButtonFormField<String>(
                   value: intensity,
                   items: TrainingLog.intensityLevels
-                      .map((t) => DropdownMenuItem(
-                          value: t, child: Text(t)))
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
-                  onChanged: (v) =>
-                      setState(() => intensity = v ?? 'Moderate'),
-                  decoration: const InputDecoration(
-                      labelText: 'Intensity'),
+                  onChanged: (v) => setState(() => intensity = v ?? 'Moderate'),
+                  decoration: const InputDecoration(labelText: 'Intensity'),
                 ),
                 TextField(
                   controller: durationCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Duration (minutes)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Duration (minutes)'),
                 ),
-                Text(
-                    'Performance rating: ${rating.round()} / 5'),
+                Text('Performance rating: ${rating.round()} / 5'),
                 Slider(
                   value: rating,
                   min: 1,
@@ -775,8 +753,7 @@ class _TrainingTab extends StatelessWidget {
                 TextField(
                   controller: notesCtrl,
                   maxLines: 2,
-                  decoration: const InputDecoration(
-                      labelText: 'Session notes'),
+                  decoration: const InputDecoration(labelText: 'Session notes'),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -788,17 +765,15 @@ class _TrainingTab extends StatelessWidget {
                       date: DateTime.now(),
                       type: type,
                       intensity: intensity,
-                      durationMinutes: int.tryParse(
-                              durationCtrl.text.trim()) ??
-                          45,
+                      durationMinutes:
+                          int.tryParse(durationCtrl.text.trim()) ?? 45,
                       performanceRating: rating.round(),
                       notes: notesCtrl.text.trim().isEmpty
                           ? null
                           : notesCtrl.text.trim(),
-                      trainerName:
-                          trainerCtrl.text.trim().isEmpty
-                              ? null
-                              : trainerCtrl.text.trim(),
+                      trainerName: trainerCtrl.text.trim().isEmpty
+                          ? null
+                          : trainerCtrl.text.trim(),
                     ));
                     if (ctx.mounted) Navigator.pop(ctx);
                   },
@@ -821,8 +796,7 @@ class _TrainingTab extends StatelessWidget {
         builder: (context, snapshot) {
           final logs = snapshot.data ?? [];
           if (logs.isEmpty) {
-            return const Center(
-                child: Text('No training sessions yet.'));
+            return const Center(child: Text('No training sessions yet.'));
           }
           return ListView(
             children: logs.map((l) {
@@ -838,16 +812,13 @@ class _TrainingTab extends StatelessWidget {
                       '${l.type} - ${l.durationMinutes} min - ${l.intensity}'),
                   subtitle: Text(
                     DateFormat.yMMMd().format(l.date) +
-                        (l.trainerName != null
-                            ? ' - ${l.trainerName}'
-                            : '') +
+                        (l.trainerName != null ? ' - ${l.trainerName}' : '') +
                         (l.notes != null ? '\n${l.notes}' : ''),
                   ),
                   isThreeLine: l.notes != null,
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: () =>
-                        fs.deleteTrainingLog(l.id),
+                    onPressed: () => fs.deleteTrainingLog(l.id),
                   ),
                 ),
               );
@@ -876,8 +847,11 @@ class _RemindersTab extends StatelessWidget {
     // Default: 7 days from now at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day,
-      now.hour, now.minute,
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
     );
     // The time component is tracked separately for display
     TimeOfDay dueTime = TimeOfDay(hour: now.hour, minute: now.minute);
@@ -891,59 +865,62 @@ class _RemindersTab extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
+            left: 16,
+            right: 16,
+            top: 16,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Add reminder',
-                  style: Theme.of(ctx).textTheme.titleLarge),
+              Text('Add reminder', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 12),
               TextField(
                   controller: titleCtrl,
-                  decoration:
-                      const InputDecoration(labelText: 'Title')),
+                  decoration: const InputDecoration(labelText: 'Title')),
               DropdownButtonFormField<String>(
                 value: category,
                 items: [
-                  'Vet', 'Farrier', 'Dental', 'Deworm',
-                  'Vaccine', 'Supplement Refill', 'General'
+                  'Vet',
+                  'Farrier',
+                  'Dental',
+                  'Deworm',
+                  'Vaccine',
+                  'Supplement Refill',
+                  'General'
                 ]
-                    .map((t) => DropdownMenuItem(
-                        value: t, child: Text(t)))
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
-                onChanged: (v) =>
-                    setState(() => category = v ?? 'Vet'),
-                decoration: const InputDecoration(
-                    labelText: 'Category'),
+                onChanged: (v) => setState(() => category = v ?? 'Vet'),
+                decoration: const InputDecoration(labelText: 'Category'),
               ),
               TextField(
                   controller: notesCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Notes (optional)')),
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)')),
 
               // ── DATE PICKER ────────────────────────────────────
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(
-                    'Date: ${DateFormat.yMMMd().format(dueDate)}'),
+                title: Text('Date: ${DateFormat.yMMMd().format(dueDate)}'),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: ctx,
                     initialDate: dueDate,
                     firstDate: DateTime.now(),
-                    lastDate: DateTime.now()
-                        .add(const Duration(days: 730)),
+                    lastDate: DateTime.now().add(const Duration(days: 730)),
                   );
                   if (picked != null) {
                     setState(() {
                       // Keep the already-chosen time, just update date
                       dueDate = DateTime(
-                        picked.year, picked.month, picked.day,
-                        dueTime.hour, dueTime.minute,
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        dueTime.hour,
+                        dueTime.minute,
                       );
                     });
                   }
@@ -956,8 +933,7 @@ class _RemindersTab extends StatelessWidget {
               // time of day, one day earlier — NOT at midnight.
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(
-                    'Time: ${dueTime.format(ctx)}'),
+                title: Text('Time: ${dueTime.format(ctx)}'),
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
                   final picked = await showTimePicker(
@@ -970,8 +946,11 @@ class _RemindersTab extends StatelessWidget {
                       dueTime = picked;
                       // Combine the current date with the new time
                       dueDate = DateTime(
-                        dueDate.year, dueDate.month, dueDate.day,
-                        picked.hour, picked.minute,
+                        dueDate.year,
+                        dueDate.month,
+                        dueDate.day,
+                        picked.hour,
+                        picked.minute,
                       );
                     });
                   }
@@ -987,7 +966,7 @@ class _RemindersTab extends StatelessWidget {
                     horseId: horse.id,
                     ownerId: fs.uid,
                     title: titleCtrl.text.trim(),
-                    dueDate: dueDate,   // now has both date AND time
+                    dueDate: dueDate, // now has both date AND time
                     category: category,
                     notes: notesCtrl.text.trim().isEmpty
                         ? null
@@ -1030,15 +1009,13 @@ class _RemindersTab extends StatelessWidget {
         builder: (context, snapshot) {
           final reminders = snapshot.data ?? [];
           if (reminders.isEmpty) {
-            return const Center(
-                child: Text('No reminders yet.'));
+            return const Center(child: Text('No reminders yet.'));
           }
           return ListView(
             children: reminders.map((r) {
               Color? cardColor;
               if (r.isOverdue) cardColor = Colors.red.shade50;
-              if (r.isDueSoon)
-                cardColor = Colors.yellow.shade50;
+              if (r.isDueSoon) cardColor = Colors.yellow.shade50;
               return Card(
                 color: cardColor,
                 child: CheckboxListTile(
@@ -1051,28 +1028,22 @@ class _RemindersTab extends StatelessWidget {
                       // Cancel scheduled notifications when done
                       await context
                           .read<NotificationService>()
-                          .cancelReminderNotifications(
-                              r.id.hashCode);
+                          .cancelReminderNotifications(r.id.hashCode);
                     }
                   },
                   title: Text(
                     r.title,
                     style: TextStyle(
-                      decoration: r.isComplete
-                          ? TextDecoration.lineThrough
-                          : null,
-                      fontWeight: r.isOverdue
-                          ? FontWeight.bold
-                          : null,
+                      decoration:
+                          r.isComplete ? TextDecoration.lineThrough : null,
+                      fontWeight: r.isOverdue ? FontWeight.bold : null,
                     ),
                   ),
                   subtitle: Text(
                     '${r.category} - Due ${DateFormat.yMMMd().add_jm().format(r.dueDate)}'
                     '${r.isOverdue ? " - OVERDUE" : r.isDueSoon ? " - DUE SOON" : ""}'
                     '${r.notes != null ? "\n${r.notes}" : ""}',
-                    style: TextStyle(
-                        color:
-                            r.isOverdue ? Colors.red : null),
+                    style: TextStyle(color: r.isOverdue ? Colors.red : null),
                   ),
                   isThreeLine: r.notes != null,
                   secondary: IconButton(
@@ -1081,8 +1052,7 @@ class _RemindersTab extends StatelessWidget {
                       // Cancel notifications before deleting
                       await context
                           .read<NotificationService>()
-                          .cancelReminderNotifications(
-                              r.id.hashCode);
+                          .cancelReminderNotifications(r.id.hashCode);
                       fs.deleteReminder(r.id);
                     },
                   ),
@@ -1114,8 +1084,11 @@ class _BarnTasksTab extends StatelessWidget {
     // Default: today at current time of day
     final now = DateTime.now();
     DateTime dueDate = DateTime(
-      now.year, now.month, now.day,
-      now.hour, now.minute,
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
     );
     TimeOfDay dueTime = TimeOfDay(hour: now.hour, minute: now.minute);
 
@@ -1127,7 +1100,9 @@ class _BarnTasksTab extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
+            left: 16,
+            right: 16,
+            top: 16,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
           ),
           child: Column(
@@ -1139,48 +1114,44 @@ class _BarnTasksTab extends StatelessWidget {
               const SizedBox(height: 12),
               TextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Task title')),
+                  decoration: const InputDecoration(labelText: 'Task title')),
               TextField(
                   controller: assignedCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Assigned to (name)')),
+                  decoration:
+                      const InputDecoration(labelText: 'Assigned to (name)')),
               DropdownButtonFormField<String>(
                 value: category,
                 items: BarnTask.categories
-                    .map((c) => DropdownMenuItem(
-                        value: c, child: Text(c)))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
-                onChanged: (v) =>
-                    setState(() => category = v ?? 'Feeding'),
-                decoration: const InputDecoration(
-                    labelText: 'Category'),
+                onChanged: (v) => setState(() => category = v ?? 'Feeding'),
+                decoration: const InputDecoration(labelText: 'Category'),
               ),
               TextField(
                   controller: notesCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Notes (optional)')),
+                  decoration:
+                      const InputDecoration(labelText: 'Notes (optional)')),
 
               // ── DATE PICKER ────────────────────────────────────
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(
-                    'Date: ${DateFormat.yMMMd().format(dueDate)}'),
+                title: Text('Date: ${DateFormat.yMMMd().format(dueDate)}'),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: ctx,
                     initialDate: dueDate,
-                    firstDate: DateTime.now()
-                        .subtract(const Duration(days: 1)),
-                    lastDate: DateTime.now()
-                        .add(const Duration(days: 365)),
+                    firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (picked != null) {
                     setState(() {
                       dueDate = DateTime(
-                        picked.year, picked.month, picked.day,
-                        dueTime.hour, dueTime.minute,
+                        picked.year,
+                        picked.month,
+                        picked.day,
+                        dueTime.hour,
+                        dueTime.minute,
                       );
                     });
                   }
@@ -1193,8 +1164,7 @@ class _BarnTasksTab extends StatelessWidget {
               // time of day, one day earlier — NOT at midnight.
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(
-                    'Time: ${dueTime.format(ctx)}'),
+                title: Text('Time: ${dueTime.format(ctx)}'),
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
                   final picked = await showTimePicker(
@@ -1206,8 +1176,11 @@ class _BarnTasksTab extends StatelessWidget {
                     setState(() {
                       dueTime = picked;
                       dueDate = DateTime(
-                        dueDate.year, dueDate.month, dueDate.day,
-                        picked.hour, picked.minute,
+                        dueDate.year,
+                        dueDate.month,
+                        dueDate.day,
+                        picked.hour,
+                        picked.minute,
                       );
                     });
                   }
@@ -1225,7 +1198,7 @@ class _BarnTasksTab extends StatelessWidget {
                     title: titleCtrl.text.trim(),
                     category: category,
                     assignedTo: assignedCtrl.text.trim(),
-                    dueDate: dueDate,  // now has both date AND time
+                    dueDate: dueDate, // now has both date AND time
                     notes: notesCtrl.text.trim().isEmpty
                         ? null
                         : notesCtrl.text.trim(),
@@ -1241,8 +1214,7 @@ class _BarnTasksTab extends StatelessWidget {
                   //   Notification 2: fires at 9:00 AM on the due date
                   //
                   // Both use the exact dueDate (with time), NOT just the day.
-                  final notifs =
-                      context.read<NotificationService>();
+                  final notifs = context.read<NotificationService>();
                   await notifs.scheduleBarnTaskNotifications(
                     baseId: task.id.hashCode,
                     taskTitle: task.title,
@@ -1271,15 +1243,12 @@ class _BarnTasksTab extends StatelessWidget {
         builder: (context, snapshot) {
           final tasks = snapshot.data ?? [];
           if (tasks.isEmpty) {
-            return const Center(
-                child: Text('No barn tasks assigned.'));
+            return const Center(child: Text('No barn tasks assigned.'));
           }
           return ListView(
             children: tasks.map((t) {
               return Card(
-                color: t.isOverdue && !t.isComplete
-                    ? Colors.red.shade50
-                    : null,
+                color: t.isOverdue && !t.isComplete ? Colors.red.shade50 : null,
                 child: CheckboxListTile(
                   value: t.isComplete,
                   onChanged: (_) async {
@@ -1290,16 +1259,14 @@ class _BarnTasksTab extends StatelessWidget {
                       // Cancel scheduled notifications when done
                       await context
                           .read<NotificationService>()
-                          .cancelBarnTaskNotifications(
-                              t.id.hashCode);
+                          .cancelBarnTaskNotifications(t.id.hashCode);
                     }
                   },
                   title: Text(
                     t.title,
                     style: TextStyle(
-                        decoration: t.isComplete
-                            ? TextDecoration.lineThrough
-                            : null),
+                        decoration:
+                            t.isComplete ? TextDecoration.lineThrough : null),
                   ),
                   subtitle: Text(
                     '${t.category} - ${t.assignedTo.isNotEmpty ? "-> ${t.assignedTo}" : "Unassigned"} - ${DateFormat.yMMMd().add_jm().format(t.dueDate)}'
@@ -1313,8 +1280,7 @@ class _BarnTasksTab extends StatelessWidget {
                       // Cancel notifications before deleting
                       await context
                           .read<NotificationService>()
-                          .cancelBarnTaskNotifications(
-                              t.id.hashCode);
+                          .cancelBarnTaskNotifications(t.id.hashCode);
                       fs.deleteBarnTask(t.id);
                     },
                   ),

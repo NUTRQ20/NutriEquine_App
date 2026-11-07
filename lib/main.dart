@@ -4,11 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
-import 'services/notification_service.dart'; // also contains FeedAutoUpdateService
+import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
@@ -37,14 +36,10 @@ Future<void> main() async {
     debugPrint('Notification init error: $e');
   }
 
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FeedAutoUpdateService().runDailyCheck();
-    }
-  } catch (e) {
-    debugPrint('Feed auto update error: $e');
-  }
+  // NOTE: FeedAutoUpdateService().runDailyCheck() is called from splash_screen.dart
+  // AFTER Firebase Auth session is confirmed. It schedules notifications with
+  // Android AlarmManager — once scheduled, they fire even if the app is closed.
+  // Calling it here in main() does nothing — currentUser is null at this point.
 
   runApp(const EquineEdgeApp());
 }

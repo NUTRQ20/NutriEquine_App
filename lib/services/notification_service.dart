@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -21,7 +19,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 ///   zonedSchedule(). Even scheduling 5 seconds from now works in background.
 ///
 /// Notification ID ranges (to avoid collisions):
-///   Feed restock    : 10000 + hash  (scheduled next morning 8 AM)
+///   Feed restock    : 10000 + hash  (fires today at 8 AM if not yet passed, else tomorrow 8 AM)
 ///   Feed time AM    : 20000 + hash  (7:00 AM daily)
 ///   Feed time PM    : 21000 + hash  (6:00 PM daily)
 ///   Feed time Mid   : 22000 + hash  (12:00 PM daily)
@@ -42,6 +40,10 @@ class NotificationService {
   static const String _channelName = 'EquineEdge Notifications';
   static const String _channelDesc =
       'Feed reminders, restock alerts, care reminders and barn tasks';
+
+  // Restock alert fires at 8:00 AM — today if not yet passed, else tomorrow
+  static const int _restockHour = 8;
+  static const int _restockMinute = 0; 
 
   bool _initialized = false;
 
@@ -167,50 +169,58 @@ class NotificationService {
   // FEED PLAN NOTIFICATIONS
   // ═══════════════════════════════════════════════════════════════════
 
-  /// Schedule a LOW STOCK / OUT OF STOCK alert for tomorrow 8:00 AM.
+  /// Schedule a LOW STOCK / OUT OF STOCK alert at 8:00 AM.
+  /// Fires today at 8 AM if that time hasn't passed yet,
+  /// otherwise fires tomorrow at 8 AM.
   ///
   /// Called when:
+  ///   - A new feed entry is saved with daysRemaining ≤ 7
   ///   - User ticks a feed item and daysRemaining drops to ≤ 7
-  ///   - App opens and auto-check finds low stock (runDailyCheck)
+  ///   - App opens and runDailyCheck finds low stock
   ///
-  /// WHY TOMORROW 8 AM:
-  ///   Scheduling at a future time works even when app is closed.
-  ///   The OS AlarmManager fires the notification regardless of app state.
-  ///   Cancels any previous restock alert for same item first.
+  /// Cancels any previous restock alert for same item first.
   Future<void> scheduleRestockAlert({
     required int id,
     required String itemName,
     required int daysRemaining,
+    String horseName = '',
   }) async {
+    // Ensure plugin is initialized before scheduling
+    await init();
     // Always use positive ID — hashCode can be negative on some devices
     final safeId = id.abs();
     // Cancel previous alert for this item before scheduling new one
     await _plugin.cancel(10000 + safeId);
 
     final now = tz.TZDateTime.now(tz.local);
-    // Schedule for tomorrow 8:00 AM
-    var tomorrow8am = tz.TZDateTime(
+    // Fire today at 8 AM; if already past 8 AM, fire tomorrow at 8 AM
+    var alertTime = tz.TZDateTime(
       tz.local,
       now.year,
       now.month,
-      now.day + 1,
-      8,
-      0,
+      now.day,
+      _restockHour,
+      _restockMinute,
     );
+    if (alertTime.isBefore(now)) {
+      alertTime = alertTime.add(const Duration(days: 1));
+    }
+
+    final horseTag = horseName.isNotEmpty ? ' for $horseName' : '';
 
     final title = daysRemaining == 0
-        ? '🚨 Out of Stock: $itemName'
-        : '⚠️ Low Stock: $itemName';
+        ? '🚨 Out of Stock: $itemName$horseTag'
+        : '⚠️ Low Stock: $itemName$horseTag';
 
     final body = daysRemaining == 0
-        ? '$itemName has run out. Reorder now before feeding time!'
-        : 'Only $daysRemaining days of $itemName remaining. Time to reorder.';
+        ? '$itemName has run out$horseTag. Reorder now before feeding time!'
+        : 'Only $daysRemaining days of $itemName remaining$horseTag. Time to reorder.';
 
     await _scheduleAt(
       id: 10000 + safeId,
       title: title,
       body: body,
-      scheduledDate: tomorrow8am,
+      scheduledDate: alertTime,
     );
   }
 
@@ -548,127 +558,9 @@ class NotificationService {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FEED AUTO UPDATE SERVICE
-// ═══════════════════════════════════════════════════════════════════════════
+// NOTE: FeedAutoUpdateService lives in feed_auto_update_service.dart only.
+// Import it from there. This avoids duplicate runDailyCheck() calls
+// and duplicate notifications.
 //
-// Runs on app start for logged-in users.
-//
-// IMPORTANT — what this service does and does NOT do:
-//
-//   ✅ Reads current daysRemaining from Firestore.
-//   ✅ Fires a low-stock notification if daysRemaining ≤ 7.
-//   ❌ NEVER decrements daysRemaining automatically.
-//
-// daysRemaining is decremented ONLY when the user explicitly taps
-// the check button (✓) on a feed entry in the Feed Plan tab.
-// That tap calls FirestoreService.decrementDaysRemaining() from
-// the UI — this service has no role in the countdown.
-//
-// The previous auto-decrement logic (subtracting days elapsed since
-// lastGivenAt) was removed because it reduced the stock counter
-// without the user confirming the feed was actually given.
-//
-// Usage in main.dart:
-//   import 'notification_service.dart';
-//   // Remove: import 'feed_auto_update_service.dart';
+//   import '../services/feed_auto_update_service.dart';
 //   await FeedAutoUpdateService().runDailyCheck();
-// ═══════════════════════════════════════════════════════════════════════════
-
-class FeedAutoUpdateService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  String get _uid =>
-      FirebaseAuth.instance.currentUser?.uid ?? '';
-
-  /// Call this every time the app opens (for a logged-in user).
-  ///
-  /// Reads all feed entries and fires a low-stock notification for
-  /// any entry whose daysRemaining is already ≤ 7.
-  /// No Firestore writes are performed here — stock counts are never
-  /// modified by this service.
-  Future<void> runDailyCheck() async {
-    if (_uid.isEmpty) return;
-
-    try {
-      final snap = await _db
-          .collection('feed_entries')
-          .where('ownerId', isEqualTo: _uid)
-          .get();
-
-      final notifService = NotificationService();
-
-      // Cache horse names so we only fetch each horse once
-      final Map<String, String> horseNameCache = {};
-
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final safeId = doc.id.hashCode.abs();
-        final daysRemaining = data['daysRemaining'] as int?;
-        final itemName = data['itemName'] as String? ?? 'Supplement';
-        final timeOfDay = data['timeOfDay'] as String? ?? 'AM';
-        final storedHorseName = data['horseName'] as String?;
-        final horseId = data['horseId'] as String?;
-
-        // Resolve horse name:
-        // 1. Use stored horseName if it's set and not a placeholder
-        // 2. Otherwise look up the horse document by horseId
-        // 3. Final fallback: item name
-        String horseName;
-        final isPlaceholder = storedHorseName == null ||
-            storedHorseName.isEmpty ||
-            storedHorseName == 'Your horse';
-
-        if (!isPlaceholder) {
-          horseName = storedHorseName!;
-        } else if (horseId != null && horseId.isNotEmpty) {
-          if (horseNameCache.containsKey(horseId)) {
-            horseName = horseNameCache[horseId]!;
-          } else {
-            try {
-              final horseDoc =
-                  await _db.collection('horses').doc(horseId).get();
-              final name = horseDoc.data()?['name'] as String?;
-              horseName = (name != null && name.isNotEmpty) ? name : itemName;
-              horseNameCache[horseId] = horseName;
-              // Also patch the feed entry so future reads don't need a lookup
-              await doc.reference.update({'horseName': horseName});
-            } catch (_) {
-              horseName = itemName;
-            }
-          }
-        } else {
-          horseName = itemName;
-        }
-
-        // ── Feeding time (daily repeat at AM/Midday/PM) ──────────────
-        // Cancel first so we don't stack duplicates on repeated app opens.
-        // matchDateTimeComponents: time in scheduleFeedingTimeReminder
-        // means it repeats daily — one schedule is enough.
-        await notifService.cancelFeedingTimeReminder(safeId);
-        await notifService.scheduleFeedingTimeReminder(
-          id: safeId,
-          horseName: horseName,
-          itemName: itemName,
-          timeOfDay: timeOfDay,
-        );
-
-        // ── Restock alert (only when low stock) ──────────────────────
-        // Always cancel first so the count shown is always the CURRENT
-        // daysRemaining from Firestore — never a stale queued value.
-        await notifService.cancelNotification(10000 + safeId);
-
-        if (daysRemaining == null) continue;
-        if (daysRemaining <= 7) {
-          await notifService.scheduleRestockAlert(
-            id: safeId,
-            itemName: itemName,
-            daysRemaining: daysRemaining,
-          );
-        }
-      }
-    } catch (_) {
-      // Non-fatal — don't crash the app on startup
-    }
-  }
-}

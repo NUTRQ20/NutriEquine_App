@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/feed_auto_update_service.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'onboarding_screen.dart';
@@ -58,6 +59,9 @@ class _SplashScreenState extends State<SplashScreen>
           );
           return;
         }
+        // User is confirmed logged in — safe to run daily check here
+        // (FirebaseAuth session is fully restored at this point)
+        FeedAutoUpdateService().runDailyCheck().catchError((_) {});
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (_) => false,
